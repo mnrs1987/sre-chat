@@ -1,0 +1,12 @@
+{
+  "id": "sre-assistant-plugin",
+  "type": "panel",
+  "name": "SRE Assistant",
+  "info": {
+    "description": "Floating AI assistant for SRE insights",
+    "author": {
+      "name": "Nagarajan"
+    }
+  }
+}
+
