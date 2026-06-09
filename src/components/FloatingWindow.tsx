@@ -7,14 +7,13 @@ interface Options {
   aiUrl: string;
 }
 
-export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height, width }) => {
+export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false); // minimized initially
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
     setMessages(prev => [...prev, `You: ${input}`]);
 
     try {
@@ -25,17 +24,15 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height,
           'Authorization': `Bearer ${options.apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",   // or "gpt-4o"
+          model: "gpt-4o-mini",
           messages: [{ role: "user", content: input }],
           max_tokens: 200,
         }),
       });
 
       const data = await response.json();
-      console.log("OpenAI response:", data); // Debugging
-
       const reply = data.choices?.[0]?.message?.content ?? "No response from AI";
-      setMessages(prev => [...prev, `AI: ${reply}`]);
+      setMessages(prev => [...prev, `Assistant: ${reply}`]);
     } catch (err) {
       setMessages(prev => [...prev, `Error: ${err}`]);
     }
@@ -48,46 +45,87 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height,
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: expanded ? height : 50,
-        background: '#1f1f1f',
-        color: '#fff',
+        justifyContent: 'flex-end',
+        height: height,
+        background: 'var(--grafana-background-primary)', // Grafana theme background
+        color: 'var(--grafana-text-primary)',
         borderRadius: 8,
+        border: '1px solid #d3d3d336', // subtle light border
         overflow: 'hidden',
-        transition: 'height 0.3s ease, width 0.3s ease',
       }}
     >
-      {/* Title bar toggles expand/collapse */}
+      {/* Animated inner wrapper */}
       <div
         style={{
+          height: expanded ? '100%' : '40px',
+          transition: 'height 0.3s ease',
           display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 8,
-          cursor: 'pointer',
-          background: '#2a2a2a',
+          flexDirection: 'column',
         }}
-        onClick={() => setExpanded(!expanded)}
       >
-        <strong>{expanded ? 'SRE Assistant (click to minimize)' : 'SRE Assistant (click to maximize)'}</strong>
-      </div>
+        {/* Title bar toggles expand/collapse */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 8,
+            cursor: 'pointer',
+            background: 'var(--grafana-background-secondary)',
+          }}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <strong>{expanded ? 'SRE Assistant (minimize)' : 'SRE Assistant (maximize)'}</strong>
+        </div>
 
-      {expanded && (
-        <>
-          <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
-            {messages.length === 0 ? (
-              <p style={{ opacity: 0.7 }}>AI insights will appear here…</p>
-            ) : (
-              messages.map((msg, idx) => (
-                <p key={idx} style={{ margin: '4px 0' }}>{msg}</p>
-              ))
-            )}
-          </div>
+        {/* Slide‑up content */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: expanded ? 12 : 0,
+            opacity: expanded ? 1 : 0,
+            transition: 'opacity 0.3s ease, padding 0.3s ease',
+          }}
+        >
+          {expanded && (
+            <>
+              {messages.length === 0 ? (
+                <p style={{ opacity: 0.7 }}>AI insights will appear here…</p>
+              ) : (
+                messages.map((msg, idx) => {
+                  const isUser = msg.startsWith("You:");
+                  return (
+                    <p
+                      key={idx}
+                      style={{
+                        margin: '4px 0',
+                        fontWeight: isUser ? 'bold' : 'normal',
+                        color: isUser ? 'var(--grafana-text-primary)' : 'var(--grafana-text-secondary)',
+                        background: isUser ? 'rgba(192,192,192,0.2)' : 'transparent',
+                        padding: '4px 6px',
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>{isUser ? '👤' : '🤖'}</span>
+                      <span>{msg}</span>
+                    </p>
+                  );
+                })
+              )}
+            </>
+          )}
+        </div>
 
+        {expanded && (
           <div
             style={{
-              borderTop: '1px solid #444',
+              borderTop: '1px solid var(--grafana-background-secondary)',
               padding: 8,
-              background: '#2a2a2a',
+              background: 'var(--grafana-background-secondary)',
               display: 'flex',
               gap: 8,
             }}
@@ -98,10 +136,10 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height,
               placeholder="Type your question..."
               style={{ flex: 1 }}
             />
-            <Button onClick={handleSend}>Send</Button>
+            <Button onClick={handleSend}>Ask</Button>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 };
