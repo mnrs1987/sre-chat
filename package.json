@@ -1,5 +1,5 @@
 {
-  "name": "srechat",
+  "name": "sre-assistant",
   "version": "1.0.0",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
@@ -13,7 +13,7 @@
     "server": "docker compose up --build",
     "sign": "sign-plugin"
   },
-  "author": "Cvs",
+  "author": "Aetna",
   "license": "Apache-2.0",
   "devDependencies": {
     "@grafana/eslint-config": "^9.0.0",
