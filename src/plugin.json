@@ -1,12 +1,20 @@
 {
-  "id": "sre-assistant-plugin",
   "type": "panel",
   "name": "SRE Assistant",
+  "id": "sre-assistant-plugin",
   "info": {
-    "description": "Floating AI assistant for SRE insights",
+    "description": "AI Assistant for SRE insights",
     "author": {
-      "name": "Nagarajan"
-    }
+      "name": "Aetna"
+    },
+    "links": [],
+    "screenshots": [],
+    "version": "1.0.0",
+    "updated": "2026-04-27"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.4.0",
+    "plugins": []
   }
 }
-
+ 
