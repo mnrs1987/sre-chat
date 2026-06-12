@@ -1,8 +1,10 @@
 {
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "panel",
   "name": "SRE Assistant",
   "id": "sre-assistant-plugin",
   "info": {
+    "keywords": ["panel"],
     "description": "AI Assistant for SRE insights",
     "author": {
       "name": "Aetna"
@@ -17,4 +19,3 @@
     "plugins": []
   }
 }
- 
