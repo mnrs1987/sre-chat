@@ -4,35 +4,38 @@ import { Button, Input } from '@grafana/ui';
 
 interface Options {
   apiKey: string;
-  aiUrl: string;
+  mimirUrl: string;
+  tenantId: string;
 }
 
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [expanded, setExpanded] = useState(false); // minimized initially
+  const [expanded, setExpanded] = useState(false);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     setMessages(prev => [...prev, `You: ${input}`]);
 
     try {
-      const response = await fetch(options.aiUrl || 'https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(options.mimirUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${options.apiKey}`,
+          ...(options.apiKey ? { 'Authorization': `Bearer ${options.apiKey}` } : {}),
+          ...(options.tenantId ? { 'X-Scope-OrgID': options.tenantId } : {}),
         },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: input }],
-          max_tokens: 200,
-        }),
+        body: JSON.stringify({ query: input }),
       });
 
       const data = await response.json();
-      const reply = data.choices?.[0]?.message?.content ?? "No response from AI";
-      setMessages(prev => [...prev, `Assistant: ${reply}`]);
+      const result = data?.data?.result ?? [];
+
+      const reply = result.length > 0
+        ? JSON.stringify(result, null, 2)
+        : "No data returned from Mimir";
+
+      setMessages(prev => [...prev, `Mimir: ${reply}`]);
     } catch (err) {
       setMessages(prev => [...prev, `Error: ${err}`]);
     }
@@ -47,14 +50,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         flexDirection: 'column',
         justifyContent: 'flex-end',
         height: height,
-        background: 'var(--grafana-background-primary)', // Grafana theme background
+        background: 'var(--grafana-background-primary)',
         color: 'var(--grafana-text-primary)',
         borderRadius: 8,
-        border: '1px solid #d3d3d336', // subtle light border
+        border: '1px solid #d3d3d336',
         overflow: 'hidden',
       }}
     >
-      {/* Animated inner wrapper */}
       <div
         style={{
           height: expanded ? '100%' : '40px',
@@ -63,7 +65,6 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           flexDirection: 'column',
         }}
       >
-        {/* Title bar toggles expand/collapse */}
         <div
           style={{
             display: 'flex',
@@ -75,10 +76,9 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           }}
           onClick={() => setExpanded(!expanded)}
         >
-          <strong>{expanded ? 'SRE Assistant (minimize)' : 'SRE Assistant (maximize)'}</strong>
+          <strong>{expanded ? 'Mimir Assistant (minimize)' : 'Mimir Assistant (maximize)'}</strong>
         </div>
 
-        {/* Slide‑up content */}
         <div
           style={{
             flex: 1,
@@ -91,30 +91,24 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           {expanded && (
             <>
               {messages.length === 0 ? (
-                <p style={{ opacity: 0.7 }}>AI insights will appear here…</p>
+                <p style={{ opacity: 0.7 }}>Mimir query results will appear here…</p>
               ) : (
-                messages.map((msg, idx) => {
-                  const isUser = msg.startsWith("You:");
-                  return (
-                    <p
-                      key={idx}
-                      style={{
-                        margin: '4px 0',
-                        fontWeight: isUser ? 'bold' : 'normal',
-                        color: isUser ? 'var(--grafana-text-primary)' : 'var(--grafana-text-secondary)',
-                        background: isUser ? 'rgba(192,192,192,0.2)' : 'transparent',
-                        padding: '4px 6px',
-                        borderRadius: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <span>{isUser ? '👤' : '🤖'}</span>
-                      <span>{msg}</span>
-                    </p>
-                  );
-                })
+                messages.map((msg, idx) => (
+                  <pre
+                    key={idx}
+                    style={{
+                      margin: '4px 0',
+                      fontWeight: msg.startsWith("You:") ? 'bold' : 'normal',
+                      color: msg.startsWith("You:") ? 'var(--grafana-text-primary)' : 'var(--grafana-text-secondary)',
+                      background: msg.startsWith("You:") ? 'rgba(192,192,192,0.2)' : 'transparent',
+                      padding: '4px 6px',
+                      borderRadius: 4,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {msg}
+                  </pre>
+                ))
               )}
             </>
           )}
@@ -133,14 +127,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             <Input
               value={input}
               onChange={e => setInput(e.currentTarget.value)}
-              placeholder="Type your question..."
+              placeholder="Type a PromQL query..."
               style={{ flex: 1 }}
             />
-            <Button onClick={handleSend}>Ask</Button>
+            <Button onClick={handleSend}>Run</Button>
           </div>
         )}
       </div>
     </div>
   );
 };
-
