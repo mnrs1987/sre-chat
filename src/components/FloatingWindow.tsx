@@ -19,10 +19,9 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
     try {
       const response = await fetch(options.mimirUrl, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          ...(options.apiKey ? { 'Authorization': `Bearer ${options.apiKey}` } : {}),
           ...(options.tenantId ? { 'X-Scope-OrgID': options.tenantId } : {}),
         },
         body: JSON.stringify({ query: input }),
