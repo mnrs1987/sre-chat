@@ -3,74 +3,62 @@ import { PanelProps } from '@grafana/data';
 import { Button, Input } from '@grafana/ui';
 
 interface Options {
-  mimirUrl: string;
-  tenantId: string;
+  apiUrl: string;
+  method?: string;
+  tenantId?: string;
+  apiKey?: string;
+  customHeaders?: string;
 }
 
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false); // ✅ toggle state
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
     setMessages(prev => [...prev, `You: ${input}`]);
 
     try {
-      // ✅ Default fallback URL
-      const baseUrl =
-        options.mimirUrl ||
-        'http://localhost:9009/prometheus/api/v1/query';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (options.tenantId) headers['X-Scope-OrgID'] = options.tenantId;
+      if (options.apiKey) headers['Authorization'] = options.apiKey;
+      if (options.customHeaders) {
+        try {
+          Object.assign(headers, JSON.parse(options.customHeaders));
+        } catch {
+          setMessages(prev => [...prev, '❌ Error: Invalid customHeaders JSON']);
+        }
+      }
 
-      // ✅ MUST pass query via URL (NOT body)
-      const url = `${baseUrl}?query=${encodeURIComponent(input)}`;
-
-      console.log('Calling Mimir:', url);
+      const method = options.method?.toUpperCase() === 'POST' ? 'POST' : 'GET';
+      const url =
+        method === 'GET'
+          ? (options.apiUrl.includes('?')
+              ? options.apiUrl
+              : `${options.apiUrl}?query=${encodeURIComponent(input)}`)
+          : options.apiUrl;
 
       const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.tenantId && {
-            'X-Scope-OrgID': options.tenantId, // ✅ Tenant header
-          }),
-        },
+        method,
+        headers,
+        body: method === 'POST' ? JSON.stringify({ query: input }) : undefined,
       });
 
-      // ✅ Handle HTTP errors
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+        setMessages(prev => [...prev, `❌ Error: HTTP ${response.status} - ${response.statusText}`]);
+        return;
       }
 
-      const data = await response.json();
-      const results = data?.data?.result ?? [];
-
-      let reply = '';
-
-      if (data.status === 'success') {
-        if (results.length === 0) {
-          reply = '✅ Query successful, but no data returned';
-        } else {
-          reply = results
-            .map((r: any) => {
-              const metric = Object.entries(r.metric || {})
-                .map(([k, v]) => `${k}=${v}`)
-                .join(', ');
-
-              const value = r.value ? r.value[1] : 'N/A';
-
-              return `[${metric}] = ${value}`;
-            })
-            .join('\n');
-        }
-      } else {
-        reply = `❌ Error: ${data.error || 'Unknown error'}`;
+      const rawText = await response.text();
+      try {
+        const parsed = JSON.parse(rawText);
+        setMessages(prev => [...prev, `📊 Parsed: ${JSON.stringify(parsed, null, 2)}`]);
+      } catch {
+        setMessages(prev => [...prev, `🔎 Raw: ${rawText}`]);
       }
-
-      setMessages(prev => [...prev, `Mimir: ${reply}`]);
     } catch (err: any) {
-      setMessages(prev => [...prev, `Error: ${err.message}`]);
+      setMessages(prev => [...prev, `❌ Error: ${err.message}`]);
     }
 
     setInput('');
@@ -82,7 +70,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
-        height: height,
+        height,
         background: 'var(--grafana-background-primary)',
         color: 'var(--grafana-text-primary)',
         borderRadius: 8,
@@ -98,7 +86,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           flexDirection: 'column',
         }}
       >
-        {/* Header */}
+        {/* Header toggle */}
         <div
           style={{
             display: 'flex',
@@ -111,13 +99,11 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           onClick={() => setExpanded(!expanded)}
         >
           <strong>
-            {expanded
-              ? 'Mimir Assistant (minimize)'
-              : 'Mimir Assistant (maximize)'}
+            {expanded ? 'SRE Assistant (minimize)' : 'SRE Assistant (maximize)'}
           </strong>
         </div>
 
-        {/* Chat Area */}
+        {/* Chat area */}
         <div
           style={{
             flex: 1,
@@ -128,45 +114,39 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             whiteSpace: 'pre-wrap',
           }}
         >
-          {expanded && (
-            <>
-              {messages.length === 0 ? (
-                <p style={{ opacity: 0.7 }}>
-                  Enter a PromQL query (e.g., <b>up</b>,{' '}
-                  <b>rate(http_requests_total[5m])</b>)
-                </p>
-              ) : (
-                messages.map((msg, idx) => {
-                  const isUser = msg.startsWith('You:');
-                  return (
-                    <p
-                      key={idx}
-                      style={{
-                        margin: '4px 0',
-                        fontWeight: isUser ? 'bold' : 'normal',
-                        color: isUser
-                          ? 'var(--grafana-text-primary)'
-                          : 'var(--grafana-text-secondary)',
-                        background: isUser
-                          ? 'rgba(192,192,192,0.2)'
-                          : 'transparent',
-                        padding: '4px 6px',
-                        borderRadius: 4,
-                        display: 'flex',
-                        gap: 6,
-                      }}
-                    >
-                      <span>{isUser ? '👤' : '📊'}</span>
-                      <span>{msg}</span>
-                    </p>
-                  );
-                })
-              )}
-            </>
-          )}
+          {expanded &&
+            (messages.length === 0 ? (
+              <p style={{ opacity: 0.7 }}>
+                Enter a query (e.g., <b>up</b>, <b>rate(http_requests_total[5m])</b>)
+              </p>
+            ) : (
+              messages.map((msg, idx) => {
+                const isUser = msg.startsWith('You:');
+                return (
+                  <p
+                    key={idx}
+                    style={{
+                      margin: '4px 0',
+                      fontWeight: isUser ? 'bold' : 'normal',
+                      color: isUser
+                        ? 'var(--grafana-text-primary)'
+                        : 'var(--grafana-text-secondary)',
+                      background: isUser ? 'rgba(192,192,192,0.2)' : 'transparent',
+                      padding: '4px 6px',
+                      borderRadius: 4,
+                      display: 'flex',
+                      gap: 6,
+                    }}
+                  >
+                    <span>{isUser ? '👤' : '📊'}</span>
+                    <span>{msg}</span>
+                  </p>
+                );
+              })
+            ))}
         </div>
 
-        {/* Input */}
+        {/* Input box */}
         {expanded && (
           <div
             style={{
@@ -180,15 +160,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             <Input
               value={input}
               onChange={e => setInput(e.currentTarget.value)}
-              placeholder="Type a PromQL query (e.g., up)..."
+              placeholder="Type a query..."
               style={{ flex: 1 }}
               onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  handleSend();
-                }
+                if (e.key === 'Enter') handleSend();
               }}
             />
-            <Button onClick={handleSend}>Run</Button>
+            <Button onClick={handleSend}>Send</Button>
           </div>
         )}
       </div>
