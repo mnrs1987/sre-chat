@@ -179,3 +179,19 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           >
             <Input
               value={input}
+              onChange={e => setInput(e.currentTarget.value)}
+              placeholder="Type a PromQL query (e.g., up)..."
+              style={{ flex: 1 }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  handleSend();
+                }
+              }}
+            />
+            <Button onClick={handleSend}>Run</Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
