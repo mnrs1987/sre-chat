@@ -32,12 +32,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       }
 
       const method = options.method?.toUpperCase() === 'POST' ? 'POST' : 'GET';
-      const url =
-        method === 'GET'
-          ? (options.apiUrl.includes('?')
-              ? options.apiUrl
-              : `${options.apiUrl}?query=${encodeURIComponent(input)}`)
-          : options.apiUrl;
+      const url = options.apiUrl;
 
       const response = await fetch(url, {
         method,
