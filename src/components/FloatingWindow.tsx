@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PanelProps } from '@grafana/data';
 import { Button, Input } from '@grafana/ui';
+import { getBackendSrv } from '@grafana/runtime';
 
 interface Options {
   apiUrl: string;
@@ -13,16 +14,22 @@ interface Options {
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [expanded, setExpanded] = useState(false); // ✅ toggle state
+  const [expanded, setExpanded] = useState(false);
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
     setMessages(prev => [...prev, `You: ${input}`]);
 
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      // ✅ Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
       if (options.tenantId) headers['X-Scope-OrgID'] = options.tenantId;
       if (options.apiKey) headers['Authorization'] = options.apiKey;
+
       if (options.customHeaders) {
         try {
           Object.assign(headers, JSON.parse(options.customHeaders));
@@ -32,25 +39,34 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       }
 
       const method = options.method?.toUpperCase() === 'POST' ? 'POST' : 'GET';
-      const url = options.apiUrl;
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: method === 'POST' ? JSON.stringify({ query: input }) : undefined,
-      });
+      // ✅ Use Grafana backend proxy (IMPORTANT)
+      const response = await getBackendSrv()
+        .fetch({
+          url: `/api/plugins/sre-assistant-plugin/resources/proxy`, // 🔴 replace YOUR_PLUGIN_ID
+          method: method,
+          headers,
+          data: method === 'POST' ? { query: input } : undefined,
+        })
+        .toPromise();
 
-      if (!response.ok) {
-        setMessages(prev => [...prev, `❌ Error: HTTP ${response.status} - ${response.statusText}`]);
+      if (!response || response.status !== 200) {
+        setMessages(prev => [
+          ...prev,
+          `❌ Error: HTTP ${response?.status || 'unknown'}`
+        ]);
         return;
       }
 
-      const rawText = await response.text();
-      try {
-        const parsed = JSON.parse(rawText);
-        setMessages(prev => [...prev, `📊 Parsed: ${JSON.stringify(parsed, null, 2)}`]);
-      } catch {
-        setMessages(prev => [...prev, `🔎 Raw: ${rawText}`]);
+      const data = response.data;
+
+      if (typeof data === 'object') {
+        setMessages(prev => [
+          ...prev,
+          `📊 Parsed: ${JSON.stringify(data, null, 2)}`
+        ]);
+      } else {
+        setMessages(prev => [...prev, `🔎 Raw: ${data}`]);
       }
     } catch (err: any) {
       setMessages(prev => [...prev, `❌ Error: ${err.message}`]);
@@ -81,7 +97,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           flexDirection: 'column',
         }}
       >
-        {/* Header toggle */}
+        {/* Header */}
         <div
           style={{
             display: 'flex',
@@ -112,7 +128,8 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           {expanded &&
             (messages.length === 0 ? (
               <p style={{ opacity: 0.7 }}>
-                Enter a query (e.g., <b>up</b>, <b>rate(http_requests_total[5m])</b>)
+                Enter a query (e.g., <b>up</b>,{' '}
+                <b>rate(http_requests_total[5m])</b>)
               </p>
             ) : (
               messages.map((msg, idx) => {
@@ -141,7 +158,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             ))}
         </div>
 
-        {/* Input box */}
+        {/* Input */}
         {expanded && (
           <div
             style={{
