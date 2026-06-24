@@ -11,19 +11,12 @@
     },
     "links": [],
     "screenshots": [],
-    "version": "1.0.14",
+    "version": "1.0.2",
     "updated": "2026-06-17"
   },
   "dependencies": {
     "grafanaDependency": ">=10.4.0",
     "plugins": []
   },
-  "routes": [
-    {
-      "path": "proxy",
-      "url": "https://qaautomationapi.aetna.com/api/ithealth/infra_arria?businessUnitName=Aetna%20Technology"
-    }
-  ],
-
   "signature": "unsigned"
 }

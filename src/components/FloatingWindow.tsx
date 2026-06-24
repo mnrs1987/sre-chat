@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { PanelProps } from '@grafana/data';
 import { Button, Input } from '@grafana/ui';
-import { getBackendSrv } from '@grafana/runtime';
 
 interface Options {
   apiUrl: string;
@@ -14,81 +13,47 @@ interface Options {
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false); // ✅ toggle state
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
-    setMessages(prev => [...prev, `👤 You: ${input}`]);
+    setMessages(prev => [...prev, `You: ${input}`]);
 
     try {
-      // ✅ Headers
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (options.tenantId) headers['X-Scope-OrgID'] = options.tenantId;
       if (options.apiKey) headers['Authorization'] = options.apiKey;
-
       if (options.customHeaders) {
         try {
           Object.assign(headers, JSON.parse(options.customHeaders));
         } catch {
-          setMessages(prev => [...prev, '❌ Invalid customHeaders JSON']);
+          setMessages(prev => [...prev, '❌ Error: Invalid customHeaders JSON']);
         }
       }
 
       const method = options.method?.toUpperCase() === 'POST' ? 'POST' : 'GET';
+      const url = options.apiUrl;
 
-      // ✅ Grafana proxy call (NO CORS)
-      const response = await getBackendSrv()
-        .fetch({
-          url: `/api/plugins/sre-assistant-plugin/resources/proxy`, // ✅ your plugin id
-          method,
-          headers,
-          data: method === 'POST' ? { query: input } : undefined,
-        })
-        .toPromise();
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: method === 'POST' ? JSON.stringify({ query: input }) : undefined,
+      });
 
-      console.log('FULL RESPONSE:', response); // 🔍 debug
-
-      // ✅ Safety checks
-      if (!response) {
-        throw new Error('No response received from API');
-      }
-
-      if (response.status !== 200) {
-        setMessages(prev => [
-          ...prev,
-          `❌ HTTP ${response.status}`
-        ]);
+      if (!response.ok) {
+        setMessages(prev => [...prev, `❌ Error: HTTP ${response.status} - ${response.statusText}`]);
         return;
       }
 
-      const data = response.data;
-
-      // ✅ Avoid undefined issue
-      if (data === undefined || data === null) {
-        setMessages(prev => [...prev, '⚠️ API returned no data']);
-        return;
+      const rawText = await response.text();
+      try {
+        const parsed = JSON.parse(rawText);
+        setMessages(prev => [...prev, `📊 Parsed: ${JSON.stringify(parsed, null, 2)}`]);
+      } catch {
+        setMessages(prev => [...prev, `🔎 Raw: ${rawText}`]);
       }
-
-      // ✅ Print response
-      if (typeof data === 'object') {
-        setMessages(prev => [
-          ...prev,
-          `📊 ${JSON.stringify(data, null, 2)}`
-        ]);
-      } else {
-        setMessages(prev => [...prev, `🔎 ${data}`]);
-      }
-
     } catch (err: any) {
-      console.error(err);
-      setMessages(prev => [
-        ...prev,
-        `❌ Error: ${err.message || 'Unknown error'}`
-      ]);
+      setMessages(prev => [...prev, `❌ Error: ${err.message}`]);
     }
 
     setInput('');
@@ -116,7 +81,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           flexDirection: 'column',
         }}
       >
-        {/* Header */}
+        {/* Header toggle */}
         <div
           style={{
             display: 'flex',
@@ -140,33 +105,63 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             overflowY: 'auto',
             padding: expanded ? 12 : 0,
             opacity: expanded ? 1 : 0,
-            transition: '0.3s',
+            transition: 'opacity 0.3s ease, padding 0.3s ease',
             whiteSpace: 'pre-wrap',
           }}
         >
           {expanded &&
             (messages.length === 0 ? (
               <p style={{ opacity: 0.7 }}>
-                Try: <b>up</b> or <b>rate(http_requests_total[5m])</b>
+                Enter a query (e.g., <b>up</b>, <b>rate(http_requests_total[5m])</b>)
               </p>
             ) : (
-              messages.map((msg, i) => (
-                <p key={i} style={{ margin: '4px 0' }}>{msg}</p>
-              ))
+              messages.map((msg, idx) => {
+                const isUser = msg.startsWith('You:');
+                return (
+                  <p
+                    key={idx}
+                    style={{
+                      margin: '4px 0',
+                      fontWeight: isUser ? 'bold' : 'normal',
+                      color: isUser
+                        ? 'var(--grafana-text-primary)'
+                        : 'var(--grafana-text-secondary)',
+                      background: isUser ? 'rgba(192,192,192,0.2)' : 'transparent',
+                      padding: '4px 6px',
+                      borderRadius: 4,
+                      display: 'flex',
+                      gap: 6,
+                    }}
+                  >
+                    <span>{isUser ? '👤' : '📊'}</span>
+                    <span>{msg}</span>
+                  </p>
+                );
+              })
             ))}
         </div>
 
-        {/* Input */}
+        {/* Input box */}
         {expanded && (
-          <div style={{ display: 'flex', gap: 8, padding: 8 }}>
+          <div
+            style={{
+              borderTop: '1px solid var(--grafana-background-secondary)',
+              padding: 8,
+              background: 'var(--grafana-background-secondary)',
+              display: 'flex',
+              gap: 8,
+            }}
+          >
             <Input
               value={input}
               onChange={e => setInput(e.currentTarget.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="Type query..."
+              placeholder="Type a query..."
               style={{ flex: 1 }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSend();
+              }}
             />
-            <Button onClick={handleSend}>Send</Button>
+            <Button onClick={handleSend}>Ask</Button>
           </div>
         )}
       </div>
