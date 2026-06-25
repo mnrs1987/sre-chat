@@ -13,11 +13,12 @@ interface Options {
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [expanded, setExpanded] = useState(false); // ✅ toggle state
+  const [expanded, setExpanded] = useState(false);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    setMessages(prev => [...prev, `You: ${input}`]);
+  const handleSend = async (preset?: string) => {
+    const query = preset || input;
+    if (!query.trim()) return;
+    setMessages(prev => [...prev, `You: ${query}`]);
 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -37,7 +38,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       const response = await fetch(url, {
         method,
         headers,
-        body: method === 'POST' ? JSON.stringify({ query: input }) : undefined,
+        body: method === 'POST' ? JSON.stringify({ query }) : undefined,
       });
 
       if (!response.ok) {
@@ -58,6 +59,16 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
     setInput('');
   };
+
+  // ✅ Predefined suggestions
+  const suggestions = [
+    'Test',
+    'Last 1 days issues in logs',
+    'Traces issues for last 30 days',
+    'All issues for today',
+    'Get memory issues',
+    'Critical alerts for last 2 hours'
+  ];
 
   return (
     <div
@@ -112,7 +123,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           {expanded &&
             (messages.length === 0 ? (
               <p style={{ opacity: 0.7 }}>
-                Enter a query (e.g., <b>up</b>, <b>rate(http_requests_total[5m])</b>)
+                Enter a query (or click a suggestion below)
               </p>
             ) : (
               messages.map((msg, idx) => {
@@ -133,13 +144,40 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                       gap: 6,
                     }}
                   >
-                    <span>{isUser ? '👤' : '📊'}</span>
+                    <span>{isUser ? '👤' : '🤖'}</span>
                     <span>{msg}</span>
                   </p>
                 );
               })
             ))}
         </div>
+
+        {/* Suggestions row ABOVE input */}
+        {expanded && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: 8,
+              padding: 8,
+              margin: '8px', // ✅ gap from parent container
+              border: '1px solid #d3d3d336', // ✅ all sides border
+              borderRadius: 6, // ✅ rounded corners
+              background: 'var(--grafana-background-secondary)',
+            }}
+          >
+            {suggestions.map((s, idx) => (
+              <Button
+                key={idx}
+                variant="secondary"
+                onClick={() => handleSend(s)}
+              >
+                {s}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {/* Input box */}
         {expanded && (
@@ -161,7 +199,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                 if (e.key === 'Enter') handleSend();
               }}
             />
-            <Button onClick={handleSend}>Ask</Button>
+            <Button onClick={() => handleSend()}>Ask</Button>
           </div>
         )}
       </div>
