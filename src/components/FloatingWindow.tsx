@@ -61,7 +61,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       const rawText = await response.text();
       try {
         const parsed = JSON.parse(rawText);
-        setMessages(prev => [...prev, { text: 'Thought', json: parsed, time: timestamp() }]);
+        setMessages(prev => [...prev, { text: 'Assistant:', json: parsed, time: timestamp() }]);
       } catch {
         setMessages(prev => [...prev, { text: `🔎 Raw: ${rawText}`, time: timestamp() }]);
       }
@@ -74,14 +74,12 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   };
 
   const suggestions = [
-    'Create an image',
-    'Find the best deal',
-    'Predict the future',
-    'Take a quiz',
-    'Improve writing',
-    'Compose a song',
-    'Build a playlist',
-    'Simplify a topic',
+    'Test',
+    'Last 1 days issues in logs',
+    'Traces issues for last 30 days',
+    'All issues for today',
+    'Get memory issues',
+    'Critical alerts for last 2 hours'
   ];
 
   const modelOptions = [
@@ -95,7 +93,8 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: expanded ? height : 40,
+        justifyContent: 'flex-end',
+        height,
         background: 'var(--grafana-background-primary)',
         color: 'var(--grafana-text-primary)',
         borderRadius: 8,
@@ -117,7 +116,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         }}
         onClick={() => setExpanded(!expanded)}
       >
-        {expanded ? 'SRE Assistant (click to minimize)' : 'SRE Assistant (click to maximize)'}
+        {expanded ? 'AETNA SRE Assistant' : 'AETNA SRE Assistant'}
       </div>
 
       {expanded && (
@@ -177,8 +176,30 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
                   {/* Text + JSON */}
                   <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0 }}>{msg.text}</p>
-                    <span style={{ fontSize: '0.75em', color: '#888' }}>{msg.time}</span>
+                  <p style={{ margin: 0 }}>
+                    {isUser ? (
+                      <>
+                        <span style={{ fontWeight: 'bold' }}>You:</span>{' '}
+                        {msg.text.replace(/^You:\s*/, '')}
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontWeight: 'bold' }}>Assistant:</span>{' '}
+                        {msg.text.replace(/^Assistant:\s*/, '')}
+                      </>
+                    )}
+                  </p>
+                    <span style={{
+                      display: 'block',
+                      marginTop: 4,
+                      fontSize: '0.85em',
+                      color: isUser ? '#000' : '#FFD700', // ✅ black for user, gold for assistant
+                      fontWeight: 500,
+                      textAlign: isUser ? 'right' : 'left', // ✅ align right for user, left for AI
+                    }}
+                  >
+                    {msg.time}
+                  </span>
 
                     {msg.json && (
                       <details open style={{ marginTop: 6 }}>
