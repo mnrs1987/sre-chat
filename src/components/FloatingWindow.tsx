@@ -16,6 +16,29 @@ interface ChatMessage {
   time: string;
 }
 
+// TypingText component
+const TypingText: React.FC<{ text?: string; speed?: number }> = ({ text = '', speed = 10 }) => {
+  const [displayed, setDisplayed] = React.useState('');
+
+  React.useEffect(() => {
+    if (!text) return;
+    setDisplayed(''); // reset before animating
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayed(prev => prev + text[i]);
+      i++;
+      if (i >= text.length) clearInterval(interval);
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed]);
+
+  return (
+    <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+      {displayed}
+    </pre>
+  );
+};
+
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -177,19 +200,23 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                   {/* Text + JSON */}
                   <div style={{ flex: 1 }}>
                   <p style={{ margin: 0 }}>
-                    {isUser ? (
-                      <>
-                        <span style={{ fontWeight: 'bold' }}>You:</span>{' '}
-                        {msg.text.replace(/^You:\s*/, '')}
-                      </>
-                    ) : (
-                      <>
-                        <span style={{ fontWeight: 'bold' }}>Assistant:</span>{' '}
-                        {msg.text.replace(/^Assistant:\s*/, '')}
-                      </>
-                    )}
-                  </p>
-                    <span style={{
+                   {isUser ? (
+                     <>
+                       <span style={{ fontWeight: 'bold' }}>You:</span>{' '}
+                       {msg.text.replace(/^You:\s*/, '')}
+                     </>
+                   ) : (
+                     <>
+                       <span style={{ fontWeight: 'bold' }}>Assistant:</span>{' '}
+                       {msg.json ? (
+                         <TypingText text={JSON.stringify(msg.json, null, 2)} speed={5} />
+                       ) : msg.text ? (
+                         <TypingText text={msg.text} speed={5} />
+                       ) : ''}
+                     </>
+                   )}
+                 </p>
+                  <span style={{
                       display: 'block',
                       marginTop: 4,
                       fontSize: '0.85em',
@@ -201,14 +228,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                     {msg.time}
                   </span>
 
-                    {msg.json && (
-                      <details open style={{ marginTop: 6 }}>
-                        <summary style={{ cursor: 'pointer' }}>View JSON</summary>
-                        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                          {JSON.stringify(msg.json, null, 2)}
-                        </pre>
-                      </details>
-                    )}
+
                   </div>
                 </div>
               </div>
