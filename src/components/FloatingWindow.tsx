@@ -21,13 +21,19 @@ const TypingText: React.FC<{ text?: string; speed?: number }> = ({ text = '', sp
   const [displayed, setDisplayed] = React.useState('');
 
   React.useEffect(() => {
-    if (!text) return;
-    setDisplayed(''); // reset before animating
+    if (!text) {
+      setDisplayed('');
+      return;
+    }
+    setDisplayed('');
     let i = 0;
     const interval = setInterval(() => {
-      setDisplayed(prev => prev + text[i]);
+      if (i >= text.length) {
+        clearInterval(interval);
+        return;
+      }
+      setDisplayed(prev => prev + text.charAt(i));
       i++;
-      if (i >= text.length) clearInterval(interval);
     }, speed);
     return () => clearInterval(interval);
   }, [text, speed]);
@@ -69,11 +75,11 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       const method = options.method?.toUpperCase() === 'POST' ? 'POST' : 'GET';
       const url = options.apiUrl;
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: method === 'POST' ? JSON.stringify({ query, model: selectedModel }) : undefined,
-      });
+      if (method === 'POST') {
+        options.body = JSON.stringify({ query, model: selectedModel });
+      }
+
+      const response = await fetch(url, options);
 
       if (!response.ok) {
         setMessages(prev => [...prev, { text: `❌ Error: HTTP ${response.status} - ${response.statusText}`, time: timestamp() }]);
@@ -89,8 +95,11 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         setMessages(prev => [...prev, { text: `🔎 Raw: ${rawText}`, time: timestamp() }]);
       }
     } catch (err: any) {
-      setMessages(prev => [...prev, { text: `❌ Error: ${err.message}`, time: timestamp() }]);
-    }
+        setMessages(prev => [
+          ...prev,
+          { text: `❌ Error: ${String(err)}`, time: timestamp(), isUser: false }
+        ]);
+      }
 
     setLoading(false);
     setInput('');
@@ -200,22 +209,22 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                   {/* Text + JSON */}
                   <div style={{ flex: 1 }}>
                   <p style={{ margin: 0 }}>
-                   {isUser ? (
-                     <>
-                       <span style={{ fontWeight: 'bold' }}>You:</span>{' '}
-                       {msg.text.replace(/^You:\s*/, '')}
-                     </>
-                   ) : (
-                     <>
-                       <span style={{ fontWeight: 'bold' }}>Assistant:</span>{' '}
-                       {msg.json ? (
-                         <TypingText text={JSON.stringify(msg.json, null, 2)} speed={5} />
-                       ) : msg.text ? (
-                         <TypingText text={msg.text} speed={5} />
-                       ) : ''}
-                     </>
-                   )}
-                 </p>
+                    {isUser ? (
+                      <>
+                        <span style={{ fontWeight: 'bold' }}>You:</span>{' '}
+                        {msg.text ? msg.text.replace(/^You:\s*/, '') : ''}
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontWeight: 'bold' }}>Assistant:</span>{' '}
+                        {msg.json ? (
+                          <TypingText text={JSON.stringify(msg.json, '', 2)} speed={5} />
+                        ) : msg.text ? (
+                          <TypingText text={msg.text} speed={5} />
+                        ) : ''}
+                      </>
+                    )}
+                  </p>
                   <span style={{
                       display: 'block',
                       marginTop: 4,
