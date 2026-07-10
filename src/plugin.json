@@ -7,14 +7,14 @@
     "keywords": ["app"],
     "description": "",
     "author": {
-      "name": "Cvs"
+      "name": "CVS"
     },
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
     },
     "screenshots": [],
-    "version": "1.0.9",
+    "version": "1.0.10",
     "updated": "%TODAY%"
   },
   "includes": [

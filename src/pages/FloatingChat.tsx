@@ -231,7 +231,7 @@ export function FloatingChat() {
   const [dynOpts, setDynOpts] = useState<Options | null>(null);
 
   useEffect(() => {
-    getBackendSrv().get(`/api/plugins/cvs-sample-app/settings`)
+    getBackendSrv().get(`/api/plugins/sre-assistant-app/settings`)
       .then(res => setDynOpts(res.jsonData))
       .catch(() => setDynOpts({ apiUrl: '' } as Options));
   }, []);
