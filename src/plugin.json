@@ -1,22 +1,41 @@
 {
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
-  "type": "panel",
+  "type": "app",
   "name": "SRE Assistant",
-  "id": "sre-assistant-plugin",
+  "id": "sre-assistant-app",
   "info": {
-    "keywords": ["panel"],
-    "description": "AI Assistant for SRE insights",
+    "keywords": ["app"],
+    "description": "",
     "author": {
-      "name": "Aetna"
+      "name": "Cvs"
     },
-    "links": [],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
     "screenshots": [],
-    "version": "1.0.8",
-    "updated": "2026-06-17"
+    "version": "1.0.9",
+    "updated": "%TODAY%"
   },
+  "includes": [
+    {
+      "type": "page",
+      "name": "SRE Assistant",
+      "path": "/a/%PLUGIN_ID%/FloatingChat",
+      "addToNav": true,
+      "defaultNav": true
+    },
+    {
+      "type": "page",
+      "icon": "cog",
+      "name": "Configuration",
+      "path": "/plugins/%PLUGIN_ID%",
+      "role": "Admin",
+      "addToNav": true
+    }
+  ],
   "dependencies": {
-    "grafanaDependency": ">=10.4.0",
+    "grafanaDependency": ">=12.3.0",
     "plugins": []
-  },
-  "signature": "unsigned"
+  }
 }
