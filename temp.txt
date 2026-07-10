@@ -1,0 +1,15 @@
+<TOKEN>
+
+
+curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d '{"enabled":true}'
+
+
+curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d '{ "enabled": true, "jsonData": {},"secureJsonData": {} }'
+
+curl -H "Authorization: Bearer <TOKEN>" http://localhost:3000/api/plugins/sre-assistant-app/settings
+
+curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d "{ \"enabled\": true, \"jsonData\": {}, \"secureJsonData\": {} }"
+
+curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d "{ \"enabled\": true, \"pinned\": true, \"jsonData\": {}, \"secureJsonData\": {} }"
+
+curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d "{ \"enabled\": true, \"pinned\": true, \"jsonData\": {}, \"secureJsonData\": {} }"
