@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunksre_assistant_app=self.webpackChunksre_assistant_app||[]).push([[316],{316(t,e,a){a.r(e),a.d(e,{default:()=>i});var n=a(959),s=a.n(n),r=a(159);JSON.parse('{"id":"sre-assistant-app"}').id;var l=function(t){return t.FloatingChat="FloatingChat",t}({}),u=a(977);const i=function(t){return s().createElement(r.Routes,null,s().createElement(r.Route,{path:l.FloatingChat,element:s().createElement(u.$,null)}))}}}]);
+//# sourceMappingURL=316.js.map?_cache=3b06dedaf9a86c1230fb

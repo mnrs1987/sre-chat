@@ -22,6 +22,7 @@ interface ChatMessage {
 }
 
 // --- Component: Typing Animation ---
+// --- Updated TypingText ---
 const TypingText: React.FC<{
   text?: string;
   speed?: number;
@@ -30,10 +31,10 @@ const TypingText: React.FC<{
   onTypingStart?: () => void;
   onTypingEnd?: () => void;
 }> = ({ text = '', speed = 10, shouldAnimate = true, onTypingProgress, onTypingStart, onTypingEnd }) => {
-  const [displayed, setDisplayed] = useState(shouldAnimate ? '' : text);
+  // Use a key-based re-render so that when 'text' changes, the animation resets
+  const [displayed, setDisplayed] = useState('');
 
   useEffect(() => {
-    // If we shouldn't animate, just show text immediately
     if (!shouldAnimate) {
       setDisplayed(text);
       return;
@@ -49,23 +50,16 @@ const TypingText: React.FC<{
         onTypingEnd?.();
         return;
       }
-      // Use functional update to ensure we always have the latest string
       setDisplayed((prev) => prev + text.charAt(i));
       i++;
       onTypingProgress?.();
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, shouldAnimate]); // Re-run if text changes or animation is toggled
+  }, [text, shouldAnimate]); // Only re-run when text or animation status changes
 
   return (
-    <pre style={{
-      whiteSpace: 'pre-wrap',
-      margin: 0,
-      fontFamily: 'inherit',
-      lineHeight: 1.5,
-      fontSize: '13px'
-    }}>
+    <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit', fontSize: '13px' }}>
       {displayed}
     </pre>
   );
@@ -77,7 +71,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-msg',
-      text: "Hello! I'm your AETNA SRE Assistant. How can I help you with your metrices, logs, or traces today?",
+      text: "Hello! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
       time: new Date().toLocaleTimeString(),
       isUser: false,
     }
@@ -98,7 +92,6 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, []);
-
   // --- Updated handleSend in FloatingWindow ---
   const handleSend = async (val?: string) => {
   const query = val || input;
@@ -151,41 +144,54 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
         for (const line of lines) {
           const trimmed = line.trim();
-          // Filter ONLY lines that contain our data
-          if (trimmed.startsWith('data:')) {
-            const rawJson = trimmed.replace(/^data:\s*/, '');
-            try {
-              const json = JSON.parse(rawJson);
-              // Extract text if it's a delta
-              if (json.type === 'delta' && json.data?.text) {
-                fullStitchedText += json.data.text;
-              }
-              // Handle other JSON types if necessary
-            } catch (e) {
-              fullStitchedText += rawJson;
-            }
+          if (!trimmed.startsWith('data:')) continue;
 
-            // Update message with formatted text
-            setMessages((prev) => prev.map((m) =>
-              m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
-            ));
-            scroll();
+          const rawJson = trimmed.replace(/^data:\s*/, '');
+
+          // --- UPDATED LOGIC ---
+          try {
+            const json = JSON.parse(rawJson);
+
+            // If we find the specific delta.text, append it
+            if (json.type === 'delta' && json.data?.text) {
+              fullStitchedText += json.data.text;
+            }
+            // If the structure is different but it contains text, append it
+            else if (json.text) {
+              fullStitchedText += json.text;
+            }
+            // If it's just a raw message string, append it
+            else {
+              fullStitchedText += JSON.stringify(json);
+            }
+          } catch (e) {
+            // If JSON.parse fails, treat the whole line as raw text
+            fullStitchedText += rawJson;
           }
+          // ---------------------
+
+          // Update the message state
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
+          ));
+          scroll();
         }
       }
     } else {
-      // Handle standard JSON response
-      const raw = await res.text();
-      let displayOutput = raw;
-      try {
-        const parsed = JSON.parse(raw);
-        // Pretty print JSON
-        displayOutput = JSON.stringify(parsed, null, 2);
-      } catch (e) {}
+        // Handle standard JSON response
+        const raw = await res.text();
+        let displayOutput = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          // This creates the clean, indented JSON format
+          displayOutput = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+          displayOutput = raw; // Keep original if not JSON
+        }
 
-      setLoading(false);
-      setMessages((p) => [...p, { id: assistantMsgId, text: displayOutput, time: timestamp(), isStreaming: false }]);
-    }
+        setLoading(false);
+        setMessages((p) => [...p, { id: assistantMsgId, text: displayOutput, time: timestamp(), isStreaming: false }]);
+      }
   } catch (err: any) {
     setMessages((p) => [...p, { id: makeId(), text: `❌ Error: ${err.message}`, time: timestamp() }]);
     setLoading(false);
@@ -209,7 +215,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 2.5s linear infinite; }
         .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
-        .p-select-menu, .css-1h9z7xy-menu { z-index: 10010 !important; }
+        .p-select-menu, .css-1h9z7xy-menu .select-menu-container{ z-index: 99999 !important; }
 
         @keyframes rotateRainbow {
           0% { transform: rotate(0deg); filter: hue-rotate(0deg); }
@@ -302,13 +308,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                   {isUser ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
                   ) : (
-                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" fill="#5e5ce6" fillOpacity="0.3" stroke="#5e5ce6" strokeWidth="1" />
-                      <circle cx="12" cy="12" r="6" fill="#bf5af2" />
-                      <path d="M12 9v6M9 12h6" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                      <circle cx="12" cy="12" r="2" fill="#ffd60a" />
-                      <path d="M17 7l2-2M7 17l-2 2" stroke="#64d2ff" strokeWidth="2" />
-                    </svg>
+                     <span style={{ fontSize: 24 }}>🤖</span>
                   )}
                 </div>
                 {/* Text Column */}
@@ -322,11 +322,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                       <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>{m.text}</pre>
                     ) : (
                       <TypingText
+                        key={m.id}
                         text={m.text}
-                        shouldAnimate={!isUser && !animatedIds.has(m.id)}
+                        // Only animate if it's an assistant message
+                        shouldAnimate={!m.isUser}
                         onTypingProgress={scroll}
                         onTypingStart={() => setIsTyping(true)}
-                        onTypingEnd={() => { setIsTyping(false); setAnimatedIds(p => new Set(p).add(m.id!)); }}
+                        onTypingEnd={() => setIsTyping(false)}
                       />
                     )}
                   </div>
@@ -413,18 +415,7 @@ export function FloatingChat() {
         style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 74, height: 74, borderRadius: '50%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
       >
         <div className={`button-icon ${open ? 'button-open' : ''}`}>
-          {open ? (
-            <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span>
-          ) : (
-            /* Your Cyber-Orb SVG */
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-               <circle cx="12" cy="12" r="10" fill="#5e5ce6" fillOpacity="0.3" stroke="#5e5ce6" strokeWidth="1.5" />
-               <circle cx="12" cy="12" r="6" fill="#bf5af2" />
-               <path d="M12 9v6M9 12h6" stroke="white" strokeWidth="2" strokeLinecap="round" />
-               <circle cx="12" cy="12" r="1.5" fill="#ffd60a" />
-               <path d="M17 7l1.5-1.5M7 17l-1.5 1.5" stroke="#64d2ff" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          )}
+          {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> : <span style={{ fontSize: 32 }}>🤖</span>}
         </div>
       </div>
 
