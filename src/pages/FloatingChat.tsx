@@ -148,27 +148,30 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
           const rawJson = trimmed.replace(/^data:\s*/, '');
 
-          // --- UPDATED LOGIC ---
           try {
             const json = JSON.parse(rawJson);
 
-            // If we find the specific delta.text, append it
+            // --- UPDATED FILTERING LOGIC ---
+            // Only append text if it's the specific delta content.
+            // Skip types like 'status', 'start', 'end', 'usage', etc.
             if (json.type === 'delta' && json.data?.text) {
               fullStitchedText += json.data.text;
             }
-            // If the structure is different but it contains text, append it
-            else if (json.text) {
+            // If you receive text messages that don't have a 'type' field
+            else if (json.type === undefined && json.text) {
               fullStitchedText += json.text;
             }
-            // If it's just a raw message string, append it
-            else {
-              fullStitchedText += JSON.stringify(json);
+            // Explicitly ignore 'status', 'start', 'end', 'usage'
+            else if (['status', 'start', 'end', 'usage'].includes(json.type)) {
+              continue;
             }
+            // Fallback: If you see unexpected structures, you can log them
+            // or append them as raw text only if they contain meaningful info.
           } catch (e) {
-            // If JSON.parse fails, treat the whole line as raw text
+            // If JSON.parse fails, treat the line as raw text
             fullStitchedText += rawJson;
           }
-          // ---------------------
+          // -------------------------------
 
           // Update the message state
           setMessages((prev) => prev.map((m) =>
