@@ -13,3 +13,13 @@ curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/js
 curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d "{ \"enabled\": true, \"pinned\": true, \"jsonData\": {}, \"secureJsonData\": {} }"
 
 curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" http://localhost:3000/api/plugins/sre-assistant-app/settings -d "{ \"enabled\": true, \"pinned\": true, \"jsonData\": {}, \"secureJsonData\": {} }"
+
+	1. Change code to work for POST method for stream inputs
+	2. Stitch the text to get proper output in ui
+	3. Make float the app plugin universally available in Grafana
+	4. Cache the typed input prompts and make 5 inputs clickable in suggestions text
+	5. Session management to keep the data whether its moved to another page, or whether its closed or open
+	6. Make the width and height in proper size even in zoomed in or zoomed out the browser page.
+	7. Make the model dropdown visible with dropdown items.
+  8. If possible make the animation smooth for opening or closing chat bot from icon.
+

@@ -1,0 +1,48 @@
+INput 
+
+{
+  "query": "Get me one error log from AVAmember",
+  "session_id": "optional-client-generated-id",
+  "system_prompt": "optional override of the default SRE system prompt"
+}
+delta
+{"type":"delta","data":{"text":" log"},"ts":"2026-07-16T11:06:42.601611+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" error"},"ts":"2026-07-16T11:06:42.601353+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" typical"},"ts":"2026-07-16T11:06:42.601084+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" a"},"ts":"2026-07-16T11:06:42.600836+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" of"},"ts":"2026-07-16T11:06:42.600579+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" example"},"ts":"2026-07-16T11:06:42.600312+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" an"},"ts":"2026-07-16T11:06:42.600035+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":"’s"},"ts":"2026-07-16T11:06:42.599762+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":" Here"},"ts":"2026-07-16T11:06:42.599465+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":"!"},"ts":"2026-07-16T11:06:42.599096+00:00"}
+16:36:42
+delta
+{"type":"delta","data":{"text":"Certainly"},"ts":"2026-07-16T11:06:42.598672+00:00"}
+16:36:42
+start
+{"type":"start","data":{"provider":"azure_openai","model":"exai-gpt-4.1"},"ts":"2026-07-16T11:06:41.727079+00:00"}
+16:36:41
+status
+{"type":"status","data":{"label":"Thinking…","stage":"thinking"},"ts":"2026-07-16T11:06:41.393097+00:00"}
+
+Output
+
