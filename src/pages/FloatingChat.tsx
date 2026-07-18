@@ -111,19 +111,14 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
   try {
     const method = (options.method || 'POST').toUpperCase();
-    const headers: Record<string, string> = {
-      'Accept': 'application/json, text/event-stream',
-    };
+    const headers: Record<string, string> = { 'Accept': 'text/event-stream, application/json' };
 
     let url = options.apiUrl;
     const fetchOpts: RequestInit = { method, headers, mode: 'cors' };
 
     if (method === 'POST') {
       headers['Content-Type'] = 'application/json';
-      fetchOpts.body = JSON.stringify({
-        query: query,
-        session_id: `sess-${Date.now()}`,
-      });
+      fetchOpts.body = JSON.stringify({ query: query, session_id: `sess-${Date.now()}` });
     } else {
       const sep = url.includes('?') ? '&' : '?';
       url = `${url}${sep}query=${encodeURIComponent(query)}&stream=true`;
@@ -134,9 +129,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
     const contentType = res.headers.get('content-type') || '';
 
-    // --- DECIDE HANDLING BEFORE LOCKING THE STREAM ---
-    if (contentType.includes('text/event-stream') || contentType.includes('application/x-ndjson')) {
-      // 1. Handling Streaming
+    if (contentType.includes('text/event-stream')) {
       const reader = res.body?.getReader();
       if (!reader) throw new Error('ReadableStream not supported');
 
@@ -158,42 +151,40 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const json = JSON.parse(trimmed);
-            if (json.type === 'delta' && json.data?.text) {
-              fullStitchedText += json.data.text;
-              setMessages((prev) => prev.map((m) =>
-                m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
-              ));
-              scroll();
+          // Filter ONLY lines that contain our data
+          if (trimmed.startsWith('data:')) {
+            const rawJson = trimmed.replace(/^data:\s*/, '');
+            try {
+              const json = JSON.parse(rawJson);
+              // Extract text if it's a delta
+              if (json.type === 'delta' && json.data?.text) {
+                fullStitchedText += json.data.text;
+              }
+              // Handle other JSON types if necessary
+            } catch (e) {
+              fullStitchedText += rawJson;
             }
-          } catch (e) {
-            fullStitchedText += trimmed; // Fallback for raw text lines
+
+            // Update message with formatted text
             setMessages((prev) => prev.map((m) =>
               m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
             ));
+            scroll();
           }
         }
       }
     } else {
-      // 2. Handling Single Response (JSON/Text)
-      // Stream is NOT locked because getReader() wasn't called yet
+      // Handle standard JSON response
       const raw = await res.text();
       let displayOutput = raw;
-
       try {
         const parsed = JSON.parse(raw);
+        // Pretty print JSON
         displayOutput = JSON.stringify(parsed, null, 2);
       } catch (e) {}
 
       setLoading(false);
-      setMessages((p) => [...p, {
-        id: assistantMsgId,
-        text: displayOutput,
-        time: timestamp(),
-        isStreaming: false
-      }]);
+      setMessages((p) => [...p, { id: assistantMsgId, text: displayOutput, time: timestamp(), isStreaming: false }]);
     }
   } catch (err: any) {
     setMessages((p) => [...p, { id: makeId(), text: `❌ Error: ${err.message}`, time: timestamp() }]);
