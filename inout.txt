@@ -49,3 +49,15 @@ event: statusdata: {"type":"status","data":{"label":"Thinking…","stage":"think
 
 Output
 
+
+{"type":"status","data":{"label":"Thinking…","stage":"thinking"},"ts":"2026-07-18T18:15:32.622883+00:00"}{"type":"start","data":{"provider":"azure_openai","model":"exai-gpt-4.1"},"ts":"2026-07-18T18:15:33.487563+00:00"}I need more context to fetch logs.  
+Please specify:
+
+- The service or application name
+- The environment (AKS or OCI)
+- The namespace (if applicable)
+- Any relevant pod or node identifiers
+
+Next step:  
+Provide the above details so I can guide you to retrieve the last 24h logs.{"type":"usage","data":{"prompt_tokens":66,"completion_tokens":66,"total_tokens":132},"ts":"2026-07-18T18:15:34.074166+00:00"}{"type":"end","data":{"finish_reason":"stop"},"ts":"2026-07-18T18:15:34.074771+00:00"}
+
