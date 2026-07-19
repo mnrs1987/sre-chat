@@ -11,8 +11,8 @@
       "name": "CVS"
     },
     "logos": {
-      "small": "img/logo.svg",
-      "large": "img/logo.svg"
+      "small": "img/plugin.png",
+      "large": "img/plugin.png"
     },
     "screenshots": [],
     "version": "1.0.16",

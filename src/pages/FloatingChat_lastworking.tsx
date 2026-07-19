@@ -67,22 +67,11 @@ const TypingText: React.FC<{
 
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
-
-    const resetChat = () => {
-    setMessages([
-      {
-        id: 'welcome-msg',
-        text: "Hi! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
-        time: new Date().toLocaleTimeString(),
-        isUser: false,
-      }
-    ]);
-  };
   // Initialize state with a welcome message from the assistant
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-msg',
-      text: "Hi! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
+      text: "Hello! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
       time: new Date().toLocaleTimeString(),
       isUser: false,
     }
@@ -226,24 +215,6 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height, borderRadius: 16 }}>
       <style>{`
-
-        /* This targets the portal created by menuShouldPortal */
-        div[class*="-MenuPortal"] {
-          z-index: 100002 !important;
-        }
-        /* Ensure the assistant window doesn't trap the menu */
-        .chat-container {
-          overflow: visible !important;
-        }
-
-        /* Force the portal to sit above your window */
-        .grafana-portal-container {
-          z-index: 100001 !important;
-        }
-        /* Ensure the select container itself isn't hiding overflow */
-        .input-yellow-mesh, .input-yellow-mesh > div {
-          overflow: visible !important;
-        }
         @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 2.5s linear infinite; }
         .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
@@ -311,42 +282,8 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       )}
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <div style={{
-        backgroundImage: 'linear-gradient(90deg, #FFD700, #FF8C00)',
-        padding: '8px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        color: '#000',
-        borderRadius: '16px 16px 0 0'
-        }}>
-        {/* Empty div to help center the title */}
-        <div style={{ width: 24 }} />
-
-        <span style={{ fontWeight: 'bold' }}>AETNA SRE Assistant</span>
-        <button
-          onClick={resetChat}
-          title="New Chat"
-          style={{
-            background: 'rgba(0,0,0,0.1)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            padding: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
-        >
-          {/* Simple "Plus" or "Refresh" Icon */}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </button>
+        <div style={{ backgroundImage: 'linear-gradient(90deg, #FFD700, #FF8C00)', padding: 10, textAlign: 'center', fontWeight: 'bold', color: '#000', borderRadius: '16px 16px 0 0' }}>
+          AETNA SRE Assistant
         </div>
 
         <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -425,25 +362,14 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
         <div style={{ padding: 16, background: '#0e1014', borderRadius: '0 0 16px 16px' }}>
           <div className="input-yellow-mesh" style={{ borderRadius: 12, padding: '2px' }}>
-            <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative', overflow: 'visible' }}>
+            <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative' }}>
               <Input value={input} onChange={e => setInput(e.currentTarget.value)} placeholder="Type a query..." style={{ background: 'transparent', border: 'none', color: '#fff', flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleSend()} />
               <Select
-                // This overrides the internal width logic
-                styles={{
-                  container: (base) => ({
-                    ...base,
-                    width: '180px', // Set to any pixel value or '100%'
-                    minWidth: '150px'
-                  }),
-                  menu: (base) => ({
-                    ...base,
-                    width: '200px', // You can make the dropdown menu wider than the box itself
-                  })
-                }}
+                width={14}
                 options={modelOptions}
                 value={modelOptions.find(o => o.value === selectedModel)}
                 onChange={v => setSelectedModel(v.value!)}
-                menuPlacement="bottom"
+                menuPlacement="top"
               />
               <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #FFD700, #FF8C00)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
@@ -457,9 +383,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 export function FloatingChat() {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ x: 30, y: 30 });
-  const [size, setSize] = useState({ width: 700, height: 650 }); // Default size
   const [isDrag, setIsDrag] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
   const [dynOpts, setDynOpts] = useState<Options | null>(null);
 
@@ -483,38 +407,6 @@ export function FloatingChat() {
     setTimeout(() => setIsDrag(false), 50);
   }, [onMove]);
 
-  const onResize = useCallback((e: MouseEvent) => {
-    e.preventDefault();
-
-    const dx = startRef.current.x - e.clientX;
-    const dy = startRef.current.y - e.clientY;
-    setSize(prev => {
-      const newWidth = prev.width + dx;
-      const newHeight = prev.height + dy;
-      return {
-        // SET MINIMUMS HERE (e.g., 350px width, 400px height)
-        width: newWidth < 350 ? 350 : newWidth,
-        height: newHeight < 400 ? 400 : newHeight
-      };
-    });
-    startRef.current = { x: e.clientX, y: e.clientY };
-  }, []);
-
-  const onUpResize = useCallback(() => {
-    document.removeEventListener('mousemove', onResize);
-    document.removeEventListener('mouseup', onUpResize);
-    setIsResizing(false);
-  }, [onResize]);
-
-  const startResizing = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-    startRef.current = { x: e.clientX, y: e.clientY };
-    document.addEventListener('mousemove', onResize);
-    document.addEventListener('mouseup', onUpResize);
-  };
-
   if (!dynOpts) return null;
 
   return (
@@ -531,48 +423,12 @@ export function FloatingChat() {
       </div>
 
       {/* The Chat Window Wrapper */}
-      <div className={`chat-container ${open ? 'chat-container-open' : ''}`}
-        style={{
-          position: 'fixed',
-          right: pos.x,
-          bottom: pos.y + 90,
-          width: size.width,
-          height: size.height,
-          zIndex: 10000,
-          // Disable transition ONLY when resizing
-          transition: isResizing ? 'none' : 'opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          display: open ? 'block' : 'none' // Improved visibility toggle
-        }}
+      <div
+        className={`chat-container ${open ? 'chat-container-open' : ''}`}
+        style={{ position: 'fixed', right: pos.x, bottom: pos.y + 90, width: '700px', height: '650px', zIndex: 10000 }}
       >
-        {/* The Resize Handle */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation(); // Prevents the drag-to-move logic from firing
-            setIsResizing(true);
-            startRef.current = { x: e.clientX, y: e.clientY };
-            document.addEventListener('mousemove', onResize);
-            document.addEventListener('mouseup', () => {
-              setIsResizing(false);
-              document.removeEventListener('mousemove', onResize);
-            }, { once: true });
-          }}
-          style={{
-            position: 'absolute',
-            top: -5,
-            left: -5,
-            width: 25,
-            height: 25,
-            cursor: 'nwse-resize',
-            zIndex: 10005,
-            background: 'transparent'
-          }}
-        >
-        {/* Visual "Handle" Icon */}
-          <div style={{ width: 10, height: 10, borderTop: '2px solid #FFD700', borderLeft: '2px solid #FFD700' }} />
-        </div>
         {dynOpts.apiUrl ? (
-          <FloatingWindow height={size.height} options={dynOpts} width={size.width} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
+          <FloatingWindow height={650} options={dynOpts} width={462} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
         ) : (
           <div style={{ background: '#1c1e24', color: '#fff', padding: 20, borderRadius: 16, border: '1px solid #444', height: '100%' }}>
             <h3>Settings Required</h3>
