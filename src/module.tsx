@@ -4,23 +4,37 @@ import { AppPlugin, type AppRootProps } from '@grafana/data';
 import { Suspense, lazy } from 'react';
 import { LoadingPlaceholder } from '@grafana/ui';
 import type { AppConfigProps } from './components/AppConfig/AppConfig';
-import { FloatingChat } from './pages/FloatingChat'; // ← your component
+import { FloatingChat } from './pages/FloatingChat';
 
-console.log('[SRE Plugin] module loaded');
-
-try {
-  const el = document.createElement('div');
-  el.id = 'sre-assistant-app';
-  document.body.appendChild(el);
-
-  ReactDOM.createRoot(el).render(
-    React.createElement(FloatingChat, {})  // ← no JSX needed here
-  );
-
-  console.log('[SRE Plugin] FloatingChat mounted');
-} catch (e) {
-  console.error('[SRE Plugin] mount failed', e);
+function mountChatbot() {
+  if (document.getElementById('sre-assistant-app')) { return; }
+  try {
+    const el = document.createElement('div');
+    el.id = 'sre-assistant-app';
+    document.body.appendChild(el);
+    ReactDOM.createRoot(el).render(React.createElement(FloatingChat, {}));
+  } catch (e) {
+    console.error('[SRE Plugin] mount failed', e);
+  }
 }
+
+// Mount on load
+mountChatbot();
+
+// Re-mount on SPA navigation using native History API
+const _pushState = window.history.pushState.bind(window.history);
+window.history.pushState = function() {
+  _pushState.apply(window.history, arguments as any);
+  mountChatbot();
+};
+
+const _replaceState = window.history.replaceState.bind(window.history);
+window.history.replaceState = function() {
+  _replaceState.apply(window.history, arguments as any);
+  mountChatbot();
+};
+
+window.addEventListener('popstate', mountChatbot);
 
 const LazyApp = lazy(() => import('./components/App/App'));
 const LazyAppConfig = lazy(() => import('./components/AppConfig/AppConfig'));
@@ -38,7 +52,6 @@ const AppConfig = (props: AppConfigProps) =>
     { fallback: React.createElement(LoadingPlaceholder, { text: '' }) },
     React.createElement(LazyAppConfig, props)
   );
-
 
 export const plugin = new AppPlugin<{}>().setRootPage(App).addConfigPage({
   title: 'Configuration',

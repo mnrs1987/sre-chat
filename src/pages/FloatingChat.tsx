@@ -355,7 +355,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 8, background: '#16181d', borderTop: '1px solid #222', justifyContent: 'center' }}>
-          {['Last 24h Logs', 'Critical Alerts', 'Memory Issues'].map((s, i) => (
+          {['Why is the alert firing? What is the remeditation?', 'Which POD is causing high CPU?', 'Show all prod logs', 'What caused CPU spike yesterday?', 'Have we seen this issue before?'].map((s, i) => (
             <Button key={i} variant="secondary" size="sm" onClick={() => handleSend(s)} style={{ borderRadius: 8 }}>{s}</Button>
           ))}
         </div>
@@ -425,7 +425,7 @@ export function FloatingChat() {
       {/* The Chat Window Wrapper */}
       <div
         className={`chat-container ${open ? 'chat-container-open' : ''}`}
-        style={{ position: 'fixed', right: pos.x, bottom: pos.y + 90, width: '462px', height: '650px', zIndex: 10000 }}
+        style={{ position: 'fixed', right: pos.x, bottom: pos.y + 90, width: '700px', height: '650px', zIndex: 10000 }}
       >
         {dynOpts.apiUrl ? (
           <FloatingWindow height={650} options={dynOpts} width={462} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
