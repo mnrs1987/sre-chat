@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PanelProps } from '@grafana/data';
 import { Button, Input, Spinner, Select } from '@grafana/ui';
 import { getBackendSrv } from '@grafana/runtime';
+import { config } from '@grafana/runtime';
 
+// Accessing the user details
+const currentUser = config.bootData.user;
+const userName = currentUser.name || currentUser.login || 'User';
 // --- Types ---
 interface Options {
   apiUrl: string;
@@ -68,23 +72,27 @@ const TypingText: React.FC<{
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
 
-    const resetChat = () => {
+  const userName = config.bootData.user.name || config.bootData.user.login || 'User';
+  // Capitalize first letter
+  const capitalizedUser = userName.charAt(0).toUpperCase() + userName.slice(1);
+  const resetChat = () => {
     setMessages([
       {
         id: 'welcome-msg',
-        text: "Hi! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
+        text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
         time: new Date().toLocaleTimeString(),
         isUser: false,
+        isStreaming: false, // Ensure this is explicitly false
       }
     ]);
   };
-  // Initialize state with a welcome message from the assistant
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-msg',
-      text: "Hi! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
+      text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
       time: new Date().toLocaleTimeString(),
       isUser: false,
+      isStreaming: false, // Ensure this is explicitly false
     }
   ]);
 
@@ -99,10 +107,18 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   const scroll = useCallback(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }
-  }, []);
+  if (chatRef.current) {
+    // Request animation frame ensures the browser has rendered the new text chunks
+    requestAnimationFrame(() => {
+      if (chatRef.current) {
+        chatRef.current.scrollTo({
+          top: chatRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    });
+  }
+}, []);
   // --- Updated handleSend in FloatingWindow ---
   const handleSend = async (val?: string) => {
   const query = val || input;
@@ -188,8 +204,9 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
           ));
-          scroll();
+          // scroll();
         }
+        setTimeout(() => scroll(), 10);
       }
     } else {
         // Handle standard JSON response
@@ -385,13 +402,28 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
                   <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
                     {m.isStreaming ? (
-                      <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>{m.text}</pre>
+                      /* For streaming, we display raw text but use a 'cursor' effect
+                       to mimic the typing animation feel */
+                    <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                      {m.text}
+                      <span style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '15px',
+                        background: '#FFD700',
+                        marginLeft: '4px',
+                        animation: 'blink 1s step-end infinite'
+                      }} />
+                      <style>{`
+                        @keyframes blink { 50% { opacity: 0; } }
+                      `}</style>
+                    </div>
                     ) : (
                       <TypingText
                         key={m.id}
                         text={m.text}
                         // Only animate if it's an assistant message
-                        shouldAnimate={!m.isUser}
+                        shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
                         onTypingProgress={scroll}
                         onTypingStart={() => setIsTyping(true)}
                         onTypingEnd={() => setIsTyping(false)}
@@ -399,7 +431,16 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                     )}
                   </div>
 
-                  <div style={{ fontSize: '10px', opacity: 0.6, marginTop: 6, textAlign: 'right' }}>
+                  <div style={{
+                    fontSize: '10px',
+                    marginTop: 6,
+                    textAlign: 'right',
+                    // Change opacity to 0.8 and use #333 (bright black/charcoal) for user
+                    // and #aaa for the assistant.
+                    color: isUser ? '#333' : '#aaa',
+                    fontWeight: 'bolder',
+                    opacity: 1
+                  }}>
                     {m.time}
                   </div>
                 </div>
