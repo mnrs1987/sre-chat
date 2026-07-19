@@ -32,11 +32,9 @@ const TypingText: React.FC<{
   text?: string;
   speed?: number;
   shouldAnimate?: boolean;
+  isStreaming?: boolean;
   onTypingProgress?: () => void;
-  onTypingStart?: () => void;
-  onTypingEnd?: () => void;
-}> = ({ text = '', speed = 10, shouldAnimate = true, onTypingProgress, onTypingStart, onTypingEnd }) => {
-  // Use a key-based re-render so that when 'text' changes, the animation resets
+}> = ({ text = '', speed = 10, shouldAnimate = true, isStreaming = false, onTypingProgress }) => {
   const [displayed, setDisplayed] = useState('');
 
   useEffect(() => {
@@ -45,30 +43,46 @@ const TypingText: React.FC<{
       return;
     }
 
-    setDisplayed('');
-    onTypingStart?.();
-
-    let i = 0;
+    // Logic to pick up typing from where it left off (for streaming)
+    let i = displayed.length;
     const interval = setInterval(() => {
-      if (i >= text.length) {
+      if (i < text.length) {
+        setDisplayed((prev) => prev + text.charAt(i));
+        i++;
+        onTypingProgress?.();
+      } else {
         clearInterval(interval);
-        onTypingEnd?.();
-        return;
       }
-      setDisplayed((prev) => prev + text.charAt(i));
-      i++;
-      onTypingProgress?.();
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, shouldAnimate]); // Only re-run when text or animation status changes
+  }, [text, shouldAnimate]);
 
   return (
-    <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit', fontSize: '13px' }}>
+    <pre style={{
+      whiteSpace: 'pre-wrap',
+      margin: 0,
+      fontFamily: 'inherit',
+      fontSize: '13px',
+      display: 'block', // Ensures it takes its own space
+      width: '100%'
+    }}>
       {displayed}
+      {isStreaming && (
+        <span style={{
+          display: 'inline-block',
+          width: '6px',
+          height: '14px',
+          background: '#FFD700',
+          marginLeft: '4px',
+          verticalAlign: 'middle',
+          animation: 'blink 1s step-end infinite'
+        }} />
+      )}
     </pre>
   );
 };
+
 
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
@@ -379,8 +393,8 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           return (
             <div key={m.id} style={{
               alignSelf: isUser ? 'flex-end' : 'flex-start',
-              maxWidth: '85%',
-              marginBottom: '8px'
+              maxWidth: '90%',
+              marginBottom: '12px'
             }}>
               <div style={{
                 display: 'flex',
@@ -412,19 +426,15 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                       /* For streaming, we display raw text but use a 'cursor' effect
                        to mimic the typing animation feel */
                        <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                         {m.text}
-                         {/* Only show cursor if it's NOT complete */}
-                         {!m.isComplete && (
-                           <span style={{
-                             display: 'inline-block',
-                             width: '5px',
-                             height: '15px',
-                             background: '#FFD700',
-                             marginLeft: '4px',
-                             verticalAlign: 'middle',
-                             animation: 'blink 1s step-end infinite'
-                           }} />
-                         )}
+                         <TypingText
+                           key={m.id}
+                           text={m.text}
+                           // Only animate if it's an assistant message
+                           shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
+                           onTypingProgress={scroll}
+                           onTypingStart={() => setIsTyping(true)}
+                           onTypingEnd={() => setIsTyping(false)}
+                         />
                        </div>
                     ) : (
                       <TypingText
