@@ -23,3 +23,10 @@ curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/js
 	7. Make the model dropdown visible with dropdown items.
   8. If possible make the animation smooth for opening or closing chat bot from icon.
 
+https://aetnainsights-sre-ai-chatops-aks-qa.aetna.com/chat/stream
+
+
+
+
+
+
