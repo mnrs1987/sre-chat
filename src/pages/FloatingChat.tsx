@@ -531,7 +531,8 @@ export function FloatingChat() {
       </div>
 
       {/* The Chat Window Wrapper */}
-      <div className={`chat-container ${open ? 'chat-container-open' : ''}`}
+      <div
+        className={`chat-container ${open ? 'chat-container-open' : ''}`}
         style={{
           position: 'fixed',
           right: pos.x,
@@ -539,37 +540,88 @@ export function FloatingChat() {
           width: size.width,
           height: size.height,
           zIndex: 10000,
-          // Disable transition ONLY when resizing
-          transition: isResizing ? 'none' : 'opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          display: open ? 'block' : 'none' // Improved visibility toggle
+          /*
+             Logic:
+             1. If resizing: 'none' (instant response)
+             2. If opening/closing: 'all 0.4s ...' (bouncy animation)
+          */
+          transition: isResizing
+            ? 'none'
+            : 'opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.2s ease, height 0.2s ease',
+
+          /* Ensure the window is always visible during the transition */
+          visibility: open || isResizing ? 'visible' : 'hidden',
+          pointerEvents: open ? 'auto' : 'none',
+          overflow: 'visible'
         }}
       >
         {/* The Resize Handle */}
         <div
           onMouseDown={(e) => {
             e.preventDefault();
-            e.stopPropagation(); // Prevents the drag-to-move logic from firing
+            e.stopPropagation();
             setIsResizing(true);
             startRef.current = { x: e.clientX, y: e.clientY };
-            document.addEventListener('mousemove', onResize);
-            document.addEventListener('mouseup', () => {
+
+            const onMove = (me: MouseEvent) => {
+              const dx = startRef.current.x - me.clientX;
+              const dy = startRef.current.y - me.clientY;
+
+              setSize(prev => ({
+                width: Math.max(350, prev.width + dx),  // Minimum Width 350px
+                height: Math.max(400, prev.height + dy) // Minimum Height 400px
+              }));
+              startRef.current = { x: me.clientX, y: me.clientY };
+            };
+            const onUp = () => {
               setIsResizing(false);
-              document.removeEventListener('mousemove', onResize);
-            }, { once: true });
+              document.removeEventListener('mousemove', onMove);
+              document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
           }}
           style={{
             position: 'absolute',
-            top: -5,
-            left: -5,
-            width: 25,
-            height: 25,
+            top: -3,      // Offset out from the container
+            left: -3,     // Offset out from the container
+            width: 24,
+            height: 24,
             cursor: 'nwse-resize',
-            zIndex: 10005,
-            background: 'transparent'
+            zIndex: 10006,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'flex-start'
+            // position: 'absolute',
+            // top: -12,             // Moved further out
+            // left: -12,            // Moved further out
+            // width: 32,
+            // height: 32,
+            // cursor: 'nwse-resize',
+            // zIndex: 10006,
+            // display: 'flex',
+            // alignItems: 'center',
+            // justifyContent: 'center',
+            // background: '#16181d', // Match your panel background
+            // borderRadius: '50%',
+            // border: '2px solid #FFD700',
+            // boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)', // Subtle glow
+            // transition: 'transform 0.2s ease',
           }}
+          // Slight hover effect to show it's interactive
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
         {/* Visual "Handle" Icon */}
-          <div style={{ width: 10, height: 10, borderTop: '2px solid #FFD700', borderLeft: '2px solid #FFD700' }} />
+        {/* The Visual Bracket */}
+        <div style={{
+          width: 14,
+          height: 14,
+          borderTop: '3px solid #FFD700',
+          borderLeft: '3px solid #FFD700',
+          borderRadius: '2px 0 0 0',
+          filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.8))' // Adds contrast against dark backgrounds
+        }} />
         </div>
         {dynOpts.apiUrl ? (
           <FloatingWindow height={size.height} options={dynOpts} width={size.width} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
