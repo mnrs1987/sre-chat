@@ -27,7 +27,6 @@ interface ChatMessage {
 }
 
 // --- Component: Typing Animation ---
-// --- Updated TypingText ---
 const TypingText: React.FC<{
   text?: string;
   speed?: number;
@@ -36,27 +35,31 @@ const TypingText: React.FC<{
   onTypingProgress?: () => void;
 }> = ({ text = '', speed = 10, shouldAnimate = true, isStreaming = false, onTypingProgress }) => {
   const [displayed, setDisplayed] = useState('');
+  const indexRef = useRef(0);
 
   useEffect(() => {
+    // If we aren't animating, just show the whole text
     if (!shouldAnimate) {
       setDisplayed(text);
+      indexRef.current = text.length;
       return;
     }
 
-    // Logic to pick up typing from where it left off (for streaming)
-    let i = displayed.length;
+    // Set up an interval to catch up to the current full 'text'
     const interval = setInterval(() => {
-      if (i < text.length) {
-        setDisplayed((prev) => prev + text.charAt(i));
-        i++;
+      if (indexRef.current < text.length) {
+        setDisplayed((prev) => prev + text.charAt(indexRef.current));
+        indexRef.current += 1;
         onTypingProgress?.();
-      } else {
+      } else if (!isStreaming) {
+        // Only clear the interval if the stream is finished
+        // AND we have reached the end of the text
         clearInterval(interval);
       }
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, shouldAnimate]);
+  }, [text, shouldAnimate, isStreaming, speed, onTypingProgress]);
 
   return (
     <pre style={{
@@ -64,7 +67,7 @@ const TypingText: React.FC<{
       margin: 0,
       fontFamily: 'inherit',
       fontSize: '13px',
-      display: 'block', // Ensures it takes its own space
+      display: 'block',
       width: '100%'
     }}>
       {displayed}
@@ -82,7 +85,6 @@ const TypingText: React.FC<{
     </pre>
   );
 };
-
 
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
