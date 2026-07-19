@@ -23,6 +23,7 @@ interface ChatMessage {
   time: string;
   isUser?: boolean;
   isStreaming?: boolean; // New flag to distinguish animation types
+  isComplete?: boolean; // New flag
 }
 
 // --- Component: Typing Animation ---
@@ -163,7 +164,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // Mark as complete and stop the loading state
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, isComplete: true } : m
+          ));
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -404,20 +411,21 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                     {m.isStreaming ? (
                       /* For streaming, we display raw text but use a 'cursor' effect
                        to mimic the typing animation feel */
-                    <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                      {m.text}
-                      <span style={{
-                        display: 'inline-block',
-                        width: '8px',
-                        height: '15px',
-                        background: '#FFD700',
-                        marginLeft: '4px',
-                        animation: 'blink 1s step-end infinite'
-                      }} />
-                      <style>{`
-                        @keyframes blink { 50% { opacity: 0; } }
-                      `}</style>
-                    </div>
+                       <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                         {m.text}
+                         {/* Only show cursor if it's NOT complete */}
+                         {!m.isComplete && (
+                           <span style={{
+                             display: 'inline-block',
+                             width: '5px',
+                             height: '15px',
+                             background: '#FFD700',
+                             marginLeft: '4px',
+                             verticalAlign: 'middle',
+                             animation: 'blink 1s step-end infinite'
+                           }} />
+                         )}
+                       </div>
                     ) : (
                       <TypingText
                         key={m.id}
