@@ -76,7 +76,7 @@ const TypingText: React.FC<{
           display: 'inline-block',
           width: '6px',
           height: '14px',
-          background: '#ff0000',
+          background: '#FFD700',
           marginLeft: '4px',
           verticalAlign: 'middle',
           animation: 'blink 1s step-end infinite'
@@ -186,6 +186,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, isComplete: true } : m
           ));
+          setLoading(false); // Explicitly stop global loading here
           break;
         }
 
@@ -287,7 +288,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         }
         @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 2.5s linear infinite; }
-        .input-yellow-mesh { background: linear-gradient(90deg, #ff0000, #FF8C00, #FFE066, #FF9500, #ff0000); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
+        .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
         .p-select-menu, .css-1h9z7xy-menu .select-menu-container{ z-index: 99999 !important; }
 
         @keyframes rotateRainbow {
@@ -298,7 +299,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           width: 18px;
           height: 18px;
           border: 3px solid rgba(255, 255, 255, 0.1);
-          border-top: 3px solid #ff0000;
+          border-top: 3px solid #FFD700;
           border-right: 3px solid #FF375F;
           border-radius: 50%;
           animation: rotateRainbow 1s linear infinite;
@@ -313,7 +314,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           100% { background-position: 0% 50%; }
         }
         .thinking-text-gradient {
-          background: linear-gradient(90deg, #ff0000, #FF375F, #bf5af2, #64d2ff, #ff0000);
+          background: linear-gradient(90deg, #FFD700, #FF375F, #bf5af2, #64d2ff, #FFD700);
           background-size: 200% auto;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
@@ -353,7 +354,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{
-        backgroundImage: 'linear-gradient(90deg, #ff0000, #FF8C00)',
+        backgroundImage: 'linear-gradient(90deg, #FFD700, #FF8C00)',
         padding: '8px 16px',
         display: 'flex',
         alignItems: 'center',
@@ -409,7 +410,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                 padding: '12px 16px',
                 /* THE KEY CHANGE: Asymmetrical border radius */
                 borderRadius: isUser ? '20px 20px 0px 20px' : '0px 20px 20px 20px',
-                background: isUser ? 'linear-gradient(135deg, #ff0000, #FF8C00)' : 'rgba(255,255,255,0.08)',
+                background: isUser ? 'linear-gradient(135deg, #FFD700, #FF8C00)' : 'rgba(255,255,255,0.08)',
                 color: isUser ? '#000' : '#e0e0e0',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)'
@@ -474,16 +475,10 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           );
           })}
           {(loading || messages[messages.length - 1]?.isStreaming) && (
-            <div style={{
-              color: '#ff0000',
-              fontSize: '13px',
-              paddingLeft: 10,
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: '10px'
-            }}>
+            <div style={{ color: '#FFD700', fontSize: '13px', paddingLeft: 10, display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
               <div className="thinking-ring" />
               <span className="thinking-text-gradient">
+                {/* If we have a message currently streaming, say Typing, otherwise Thinking */}
                 {messages[messages.length - 1]?.isStreaming ? 'Assistant is typing...' : 'Assistant is thinking...'}
               </span>
             </div>
@@ -518,7 +513,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                 onChange={v => setSelectedModel(v.value!)}
                 menuPlacement="bottom"
               />
-              <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #ff0000, #FF8C00)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
+              <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #FFD700, #FF8C00)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
           </div>
         </div>
@@ -596,7 +591,7 @@ export function FloatingChat() {
       <div
         onMouseDown={e => { startRef.current = { x: e.clientX, y: e.clientY }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }}
         onClick={() => !isDrag && setOpen(!open)}
-        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 74, height: 74, borderRadius: '50%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #ff0000, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 74, height: 74, borderRadius: '50%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
       >
         <div className={`button-icon ${open ? 'button-open' : ''}`}>
           {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> : <span style={{ fontSize: 32 }}>🤖</span>}
@@ -677,7 +672,7 @@ export function FloatingChat() {
             // justifyContent: 'center',
             // background: '#16181d', // Match your panel background
             // borderRadius: '50%',
-            // border: '2px solid #ff0000',
+            // border: '2px solid #FFD700',
             // boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)', // Subtle glow
             // transition: 'transform 0.2s ease',
           }}
@@ -690,8 +685,8 @@ export function FloatingChat() {
         <div style={{
           width: 14,
           height: 14,
-          borderTop: '3px solid #ff0000',
-          borderLeft: '3px solid #ff0000',
+          borderTop: '3px solid #FFD700',
+          borderLeft: '3px solid #FFD700',
           borderRadius: '2px 0 0 0',
           filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.8))' // Adds contrast against dark backgrounds
         }} />
