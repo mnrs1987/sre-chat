@@ -182,11 +182,16 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          // Mark as complete and stop the loading state
+          // 1. Mark the specific message as no longer streaming
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, isComplete: true } : m
+            m.id === assistantMsgId ? { ...m, isStreaming: false, isComplete: true } : m
           ));
-          setLoading(false); // Explicitly stop global loading here
+
+          // 2. Kill the global loading state (this hides the spinner/thinking text)
+          setLoading(false);
+
+          // 3. Ensure typing state is also cleared
+          setIsTyping(false);
           break;
         }
 
@@ -251,8 +256,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   } catch (err: any) {
     setMessages((p) => [...p, { id: makeId(), text: `❌ Error: ${err.message}`, time: timestamp() }]);
     setLoading(false);
-  } finally {
     setIsTyping(false);
+  } finally {
+    // This ensures that even if something crashes, the animations stop
+    setIsTyping(false);
+    // Don't set loading(false) here if you are handling it inside the 'done' block,
+    // but it's safe to keep it here as a backup.
+    setLoading(false);
     scroll();
   }
 };
@@ -478,7 +488,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             <div style={{ color: '#FFD700', fontSize: '13px', paddingLeft: 10, display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
               <div className="thinking-ring" />
               <span className="thinking-text-gradient">
-                {/* If we have a message currently streaming, say Typing, otherwise Thinking */}
+                {/* If the last message in the array is still in streaming mode, say 'typing' */}
                 {messages[messages.length - 1]?.isStreaming ? 'Assistant is typing...' : 'Assistant is thinking...'}
               </span>
             </div>
