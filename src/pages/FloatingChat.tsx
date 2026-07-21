@@ -33,19 +33,19 @@ const TypingText: React.FC<{
   speed?: number;
   shouldAnimate?: boolean;
   isStreaming?: boolean;
+  isComplete?: boolean; // prop definition
   onTypingProgress?: () => void;
-}> = ({ text = '', speed = 10, shouldAnimate = true, isStreaming = false, onTypingProgress }) => {
+}> = ({ text = '', speed = 10, shouldAnimate = true, isStreaming = false, onTypingProgress, isComplete = false }) => {
   const [displayed, setDisplayed] = useState('');
   const indexRef = useRef(0);
 
   useEffect(() => {
-    // If we aren't animating, just show the whole text
-    if (!shouldAnimate) {
+    // If it's already complete from history, don't animate, just show it
+    if (isComplete || !shouldAnimate || isStreaming) {
       setDisplayed(text);
       indexRef.current = text.length;
       return;
     }
-
     // Set up an interval to catch up to the current full 'text'
     const interval = setInterval(() => {
       if (indexRef.current < text.length) {
@@ -60,7 +60,7 @@ const TypingText: React.FC<{
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, shouldAnimate, isStreaming, speed, onTypingProgress]);
+  }, [text, shouldAnimate, isStreaming, speed, isComplete, onTypingProgress]);
 
   return (
     <pre style={{
@@ -102,26 +102,27 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       isStreaming: false,
     }];
     setMessages(initial);
-    sessionStorage.setItem('aetna_sre_session_messages', JSON.stringify(initial));
+    localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(initial));
   };
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      // Switch from localStorage to sessionStorage
-      const saved = sessionStorage.getItem('aetna_sre_session_messages');
+      const saved = localStorage.getItem('aetna_sre_persistent_messages');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.map((m: any) => ({ ...m, isStreaming: false }));
+        // IMPORTANT: Add 'isComplete: true' so they don't re-type on load
+        return parsed.map((m: any) => ({ ...m, isStreaming: false, isComplete: true }));
       }
     } catch (e) {
-      console.error("Session storage read error", e);
+      console.error("Storage read error", e);
     }
+    // ... welcome message
     return [{
-      id: 'welcome-msg',
-      text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
-      time: new Date().toLocaleTimeString(),
-      isUser: false,
-      isStreaming: false,
+        id: 'welcome-msg',
+        text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
+        time: new Date().toLocaleTimeString(),
+        isUser: false,
+        isComplete: true // Welcome message should also be complete on refresh
     }];
   });
 
@@ -152,14 +153,11 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
   useEffect(() => {
     if (!loading && !isTyping && messages.length > 0) {
-      const messagesToSave = messages.map(m => ({
-        ...m,
-        isStreaming: false
-      }));
-      // Switch to sessionStorage
-      sessionStorage.setItem('aetna_sre_session_messages', JSON.stringify(messagesToSave));
+      const messagesToSave = messages.map(m => ({ ...m, isStreaming: false }));
+      // Save to localStorage
+      localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(messagesToSave));
     }
-  }, [loading, isTyping, messages]);
+    }, [loading, isTyping, messages]);
 
   // --- Updated handleSend in FloatingWindow ---
   const handleSend = async (val?: string) => {
@@ -314,7 +312,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height, borderRadius: 16 }}>
       <style>{`
-
+        /* Targets the plugin icon in the Grafana App/Plugin list settings */
+        img[src*="sre-assistant-app/img/plugin.png"] {
+          width: 120px !important;
+          height: auto !important;
+          max-height: 120px !important;
+          transform: scale(1.7); /* Bumps the size up 20% */
+        }
         /* This targets the portal created by menuShouldPortal */
         div[class*="-MenuPortal"] {
           z-index: 100002 !important;
@@ -491,6 +495,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                            onTypingStart={() => setIsTyping(true)}
                            onTypingEnd={() => setIsTyping(false)}
                            isStreaming={m.isStreaming} // Pass this correctly
+                           isComplete={m.isComplete} // Pass the flag from the message object
                          />
                        </div>
                     ) : (
@@ -502,6 +507,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                         onTypingProgress={scroll}
                         onTypingStart={() => setIsTyping(true)}
                         onTypingEnd={() => setIsTyping(false)}
+                        isComplete={m.isComplete} // Pass the flag from the message object
                       />
                     )}
                   </div>
