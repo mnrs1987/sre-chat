@@ -3,6 +3,7 @@ import { PanelProps } from '@grafana/data';
 import { Button, Input, Spinner, Select } from '@grafana/ui';
 import { getBackendSrv } from '@grafana/runtime';
 import { config } from '@grafana/runtime';
+import robotIcon from '../img/plugin.png'; // adjust filename as needed
 
 // Accessing the user details
 const currentUser = config.bootData.user;
@@ -93,25 +94,37 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   // Capitalize first letter
   const capitalizedUser = userName.charAt(0).toUpperCase() + userName.slice(1);
   const resetChat = () => {
-    setMessages([
-      {
-        id: 'welcome-msg',
-        text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
-        time: new Date().toLocaleTimeString(),
-        isUser: false,
-        isStreaming: false, // Ensure this is explicitly false
-      }
-    ]);
-  };
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+    const initial = [{
       id: 'welcome-msg',
       text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
       time: new Date().toLocaleTimeString(),
       isUser: false,
-      isStreaming: false, // Ensure this is explicitly false
+      isStreaming: false,
+    }];
+    setMessages(initial);
+    sessionStorage.setItem('aetna_sre_session_messages', JSON.stringify(initial));
+  };
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      // Switch from localStorage to sessionStorage
+      const saved = sessionStorage.getItem('aetna_sre_session_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({ ...m, isStreaming: false }));
+      }
+    } catch (e) {
+      console.error("Session storage read error", e);
     }
-  ]);
+    return [{
+      id: 'welcome-msg',
+      text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
+      time: new Date().toLocaleTimeString(),
+      isUser: false,
+      isStreaming: false,
+    }];
+  });
+
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -136,6 +149,18 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
     });
   }
 }, []);
+
+  useEffect(() => {
+    if (!loading && !isTyping && messages.length > 0) {
+      const messagesToSave = messages.map(m => ({
+        ...m,
+        isStreaming: false
+      }));
+      // Switch to sessionStorage
+      sessionStorage.setItem('aetna_sre_session_messages', JSON.stringify(messagesToSave));
+    }
+  }, [loading, isTyping, messages]);
+
   // --- Updated handleSend in FloatingWindow ---
   const handleSend = async (val?: string) => {
   const query = val || input;
@@ -213,6 +238,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             // Skip types like 'status', 'start', 'end', 'usage', etc.
             if (json.type === 'delta' && json.data?.text) {
               fullStitchedText += json.data.text;
+
+              // Update state without triggering the localStorage effect
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, text: fullStitchedText, isStreaming: true } : m
+                )
+              );
             }
             // If you receive text messages that don't have a 'type' field
             else if (json.type === undefined && json.text) {
@@ -231,9 +263,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           // -------------------------------
 
           // Update the message state
-          setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
-          ));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, text: fullStitchedText, isStreaming: true } // Keep isStreaming TRUE here
+                : m
+            )
+          );
           // scroll();
         }
         setTimeout(() => scroll(), 10);
@@ -404,8 +440,10 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
         <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.map((m) => {
           const isUser = !!m.isUser;
-          // NEW: Don't render the bubble yet if the assistant hasn't sent text
-          if (!isUser && m.text === '' && m.id !== 'welcome-msg') {
+          // If we are currently streaming this message, always show it
+          // otherwise, only show if it has text or is the welcome message
+          const shouldRender = isUser || m.id === 'welcome-msg' || m.text !== '' || m.isStreaming;
+          if (!shouldRender) {
             return null;
           }
           return (
@@ -452,6 +490,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                            onTypingProgress={scroll}
                            onTypingStart={() => setIsTyping(true)}
                            onTypingEnd={() => setIsTyping(false)}
+                           isStreaming={m.isStreaming} // Pass this correctly
                          />
                        </div>
                     ) : (
@@ -489,7 +528,7 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
               <div className="thinking-ring" />
               <span className="thinking-text-gradient">
                 {/* If the last message in the array is still in streaming mode, say 'typing' */}
-                {messages[messages.length - 1]?.isStreaming ? 'Assistant is typing...' : 'Assistant is thinking...'}
+                {messages[messages.length - 1]?.isStreaming ? 'Assistant is thinking...' : 'Assistant is thinking...'}
               </span>
             </div>
           )}
@@ -593,6 +632,7 @@ export function FloatingChat() {
     document.addEventListener('mouseup', onUpResize);
   };
 
+  const [isHovered, setIsHovered] = useState(false); // 1. Add this state
   if (!dynOpts) return null;
 
   return (
@@ -601,10 +641,51 @@ export function FloatingChat() {
       <div
         onMouseDown={e => { startRef.current = { x: e.clientX, y: e.clientY }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }}
         onClick={() => !isDrag && setOpen(!open)}
-        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 74, height: 74, borderRadius: '50%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 60, height: 60, borderRadius: '25%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
       >
+      {/* 3. The Tooltip Element */}
+      {isHovered && !open && !isDrag && (
+        <div style={{
+          position: 'absolute',
+          top: '-45px', // Positioned above the button
+          right: '20%',
+          backgroundColor: '#16181d',
+          color: '#FFD700',
+          padding: '6px 12px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          whiteSpace: 'nowrap',
+          border: '1px solid #FFD700',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          Aetna SRE Assistant
+          {/* Small triangle arrow at the bottom of tooltip */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-6px',
+            left: '85%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid #FFD700'
+          }} />
+        </div>
+        )}
         <div className={`button-icon ${open ? 'button-open' : ''}`}>
-          {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> : <span style={{ fontSize: 32 }}>🤖</span>}
+          {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> :  (
+        <img
+          src={robotIcon}
+          alt="Robot Icon"
+          style={{ width: 60, height: 75 }}
+        />
+      )}
         </div>
       </div>
 
@@ -670,21 +751,6 @@ export function FloatingChat() {
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'flex-start'
-            // position: 'absolute',
-            // top: -12,             // Moved further out
-            // left: -12,            // Moved further out
-            // width: 32,
-            // height: 32,
-            // cursor: 'nwse-resize',
-            // zIndex: 10006,
-            // display: 'flex',
-            // alignItems: 'center',
-            // justifyContent: 'center',
-            // background: '#16181d', // Match your panel background
-            // borderRadius: '50%',
-            // border: '2px solid #FFD700',
-            // boxShadow: '0 0 10px rgba(255, 215, 0, 0.3)', // Subtle glow
-            // transition: 'transform 0.2s ease',
           }}
           // Slight hover effect to show it's interactive
           onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}

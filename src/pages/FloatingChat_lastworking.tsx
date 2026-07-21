@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PanelProps } from '@grafana/data';
 import { Button, Input, Spinner, Select } from '@grafana/ui';
 import { getBackendSrv } from '@grafana/runtime';
+import { config } from '@grafana/runtime';
+import robotIcon from '../img/plugin.png'; // adjust filename as needed
 
+// Accessing the user details
+const currentUser = config.bootData.user;
+const userName = currentUser.name || currentUser.login || 'User';
 // --- Types ---
 interface Options {
   apiUrl: string;
@@ -19,61 +24,93 @@ interface ChatMessage {
   time: string;
   isUser?: boolean;
   isStreaming?: boolean; // New flag to distinguish animation types
+  isComplete?: boolean; // New flag
 }
 
 // --- Component: Typing Animation ---
-// --- Updated TypingText ---
 const TypingText: React.FC<{
   text?: string;
   speed?: number;
   shouldAnimate?: boolean;
+  isStreaming?: boolean;
   onTypingProgress?: () => void;
-  onTypingStart?: () => void;
-  onTypingEnd?: () => void;
-}> = ({ text = '', speed = 10, shouldAnimate = true, onTypingProgress, onTypingStart, onTypingEnd }) => {
-  // Use a key-based re-render so that when 'text' changes, the animation resets
+}> = ({ text = '', speed = 10, shouldAnimate = true, isStreaming = false, onTypingProgress }) => {
   const [displayed, setDisplayed] = useState('');
+  const indexRef = useRef(0);
 
   useEffect(() => {
+    // If we aren't animating, just show the whole text
     if (!shouldAnimate) {
       setDisplayed(text);
+      indexRef.current = text.length;
       return;
     }
 
-    setDisplayed('');
-    onTypingStart?.();
-
-    let i = 0;
+    // Set up an interval to catch up to the current full 'text'
     const interval = setInterval(() => {
-      if (i >= text.length) {
+      if (indexRef.current < text.length) {
+        setDisplayed((prev) => prev + text.charAt(indexRef.current));
+        indexRef.current += 1;
+        onTypingProgress?.();
+      } else if (!isStreaming) {
+        // Only clear the interval if the stream is finished
+        // AND we have reached the end of the text
         clearInterval(interval);
-        onTypingEnd?.();
-        return;
       }
-      setDisplayed((prev) => prev + text.charAt(i));
-      i++;
-      onTypingProgress?.();
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, shouldAnimate]); // Only re-run when text or animation status changes
+  }, [text, shouldAnimate, isStreaming, speed, onTypingProgress]);
 
   return (
-    <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit', fontSize: '13px' }}>
+    <pre style={{
+      whiteSpace: 'pre-wrap',
+      margin: 0,
+      fontFamily: 'inherit',
+      fontSize: '13px',
+      display: 'block',
+      width: '100%'
+    }}>
       {displayed}
+      {isStreaming && (
+        <span style={{
+          display: 'inline-block',
+          width: '6px',
+          height: '14px',
+          background: '#FFD700',
+          marginLeft: '4px',
+          verticalAlign: 'middle',
+          animation: 'blink 1s step-end infinite'
+        }} />
+      )}
     </pre>
   );
 };
 
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
-  // Initialize state with a welcome message from the assistant
+
+  const userName = config.bootData.user.name || config.bootData.user.login || 'User';
+  // Capitalize first letter
+  const capitalizedUser = userName.charAt(0).toUpperCase() + userName.slice(1);
+  const resetChat = () => {
+    setMessages([
+      {
+        id: 'welcome-msg',
+        text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
+        time: new Date().toLocaleTimeString(),
+        isUser: false,
+        isStreaming: false, // Ensure this is explicitly false
+      }
+    ]);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-msg',
-      text: "Hello! I'm your AETNA SRE Assistant. \nHow can I help you with your metrices, logs, or traces today?",
+      text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
       time: new Date().toLocaleTimeString(),
       isUser: false,
+      isStreaming: false, // Ensure this is explicitly false
     }
   ]);
 
@@ -88,10 +125,18 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   const scroll = useCallback(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }
-  }, []);
+  if (chatRef.current) {
+    // Request animation frame ensures the browser has rendered the new text chunks
+    requestAnimationFrame(() => {
+      if (chatRef.current) {
+        chatRef.current.scrollTo({
+          top: chatRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    });
+  }
+}, []);
   // --- Updated handleSend in FloatingWindow ---
   const handleSend = async (val?: string) => {
   const query = val || input;
@@ -127,7 +172,8 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       if (!reader) throw new Error('ReadableStream not supported');
 
       setMessages((p) => [...p, { id: assistantMsgId, text: '', time: timestamp(), isStreaming: true }]);
-      setLoading(false);
+      setLoading(true);
+      setIsTyping(true);
       setAnimatedIds((prev) => new Set(prev).add(assistantMsgId));
 
       const decoder = new TextDecoder();
@@ -136,7 +182,19 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // 1. Mark the specific message as no longer streaming
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, isStreaming: false, isComplete: true } : m
+          ));
+
+          // 2. Kill the global loading state (this hides the spinner/thinking text)
+          setLoading(false);
+
+          // 3. Ensure typing state is also cleared
+          setIsTyping(false);
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -177,8 +235,9 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
           setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, text: fullStitchedText } : m
           ));
-          scroll();
+          // scroll();
         }
+        setTimeout(() => scroll(), 10);
       }
     } else {
         // Handle standard JSON response
@@ -198,8 +257,13 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   } catch (err: any) {
     setMessages((p) => [...p, { id: makeId(), text: `❌ Error: ${err.message}`, time: timestamp() }]);
     setLoading(false);
-  } finally {
     setIsTyping(false);
+  } finally {
+    // This ensures that even if something crashes, the animations stop
+    setIsTyping(false);
+    // Don't set loading(false) here if you are handling it inside the 'done' block,
+    // but it's safe to keep it here as a backup.
+    setLoading(false);
     scroll();
   }
 };
@@ -215,6 +279,24 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height, borderRadius: 16 }}>
       <style>{`
+
+        /* This targets the portal created by menuShouldPortal */
+        div[class*="-MenuPortal"] {
+          z-index: 100002 !important;
+        }
+        /* Ensure the assistant window doesn't trap the menu */
+        .chat-container {
+          overflow: visible !important;
+        }
+
+        /* Force the portal to sit above your window */
+        .grafana-portal-container {
+          z-index: 100001 !important;
+        }
+        /* Ensure the select container itself isn't hiding overflow */
+        .input-yellow-mesh, .input-yellow-mesh > div {
+          overflow: visible !important;
+        }
         @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 2.5s linear infinite; }
         .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
@@ -282,18 +364,56 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
       )}
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ backgroundImage: 'linear-gradient(90deg, #FFD700, #FF8C00)', padding: 10, textAlign: 'center', fontWeight: 'bold', color: '#000', borderRadius: '16px 16px 0 0' }}>
-          AETNA SRE Assistant
+      <div style={{
+        backgroundImage: 'linear-gradient(90deg, #FFD700, #FF8C00)',
+        padding: '8px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        color: '#000',
+        borderRadius: '16px 16px 0 0'
+        }}>
+        {/* Empty div to help center the title */}
+        <div style={{ width: 24 }} />
+
+        <span style={{ fontWeight: 'bold' }}>AETNA SRE Assistant</span>
+        <button
+          onClick={resetChat}
+          title="New Chat"
+          style={{
+            background: 'rgba(0,0,0,0.1)',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
+        >
+          {/* Simple "Plus" or "Refresh" Icon */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
         </div>
 
         <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.map((m) => {
           const isUser = !!m.isUser;
+          // NEW: Don't render the bubble yet if the assistant hasn't sent text
+          if (!isUser && m.text === '' && m.id !== 'welcome-msg') {
+            return null;
+          }
           return (
             <div key={m.id} style={{
               alignSelf: isUser ? 'flex-end' : 'flex-start',
-              maxWidth: '85%',
-              marginBottom: '8px'
+              maxWidth: '90%',
+              marginBottom: '12px'
             }}>
               <div style={{
                 display: 'flex',
@@ -322,13 +442,25 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
                   <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
                     {m.isStreaming ? (
-                      <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>{m.text}</pre>
+                      /* For streaming, we display raw text but use a 'cursor' effect
+                       to mimic the typing animation feel */
+                       <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                         <TypingText
+                           key={m.id}
+                           text={m.text}
+                           // Only animate if it's an assistant message
+                           shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
+                           onTypingProgress={scroll}
+                           onTypingStart={() => setIsTyping(true)}
+                           onTypingEnd={() => setIsTyping(false)}
+                         />
+                       </div>
                     ) : (
                       <TypingText
                         key={m.id}
                         text={m.text}
                         // Only animate if it's an assistant message
-                        shouldAnimate={!m.isUser}
+                        shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
                         onTypingProgress={scroll}
                         onTypingStart={() => setIsTyping(true)}
                         onTypingEnd={() => setIsTyping(false)}
@@ -336,7 +468,16 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
                     )}
                   </div>
 
-                  <div style={{ fontSize: '10px', opacity: 0.6, marginTop: 6, textAlign: 'right' }}>
+                  <div style={{
+                    fontSize: '10px',
+                    marginTop: 6,
+                    textAlign: 'right',
+                    // Change opacity to 0.8 and use #333 (bright black/charcoal) for user
+                    // and #aaa for the assistant.
+                    color: isUser ? '#333' : '#aaa',
+                    fontWeight: 'bolder',
+                    opacity: 1
+                  }}>
                     {m.time}
                   </div>
                 </div>
@@ -344,11 +485,12 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
             </div>
           );
           })}
-          {loading && (
+          {(loading || messages[messages.length - 1]?.isStreaming) && (
             <div style={{ color: '#FFD700', fontSize: '13px', paddingLeft: 10, display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
               <div className="thinking-ring" />
               <span className="thinking-text-gradient">
-                Assistant is thinking...
+                {/* If the last message in the array is still in streaming mode, say 'typing' */}
+                {messages[messages.length - 1]?.isStreaming ? 'Assistant is thinking...' : 'Assistant is thinking...'}
               </span>
             </div>
           )}
@@ -362,14 +504,25 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 
         <div style={{ padding: 16, background: '#0e1014', borderRadius: '0 0 16px 16px' }}>
           <div className="input-yellow-mesh" style={{ borderRadius: 12, padding: '2px' }}>
-            <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative' }}>
+            <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative', overflow: 'visible' }}>
               <Input value={input} onChange={e => setInput(e.currentTarget.value)} placeholder="Type a query..." style={{ background: 'transparent', border: 'none', color: '#fff', flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleSend()} />
               <Select
-                width={14}
+                // This overrides the internal width logic
+                styles={{
+                  container: (base) => ({
+                    ...base,
+                    width: '180px', // Set to any pixel value or '100%'
+                    minWidth: '150px'
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    width: '200px', // You can make the dropdown menu wider than the box itself
+                  })
+                }}
                 options={modelOptions}
                 value={modelOptions.find(o => o.value === selectedModel)}
                 onChange={v => setSelectedModel(v.value!)}
-                menuPlacement="top"
+                menuPlacement="bottom"
               />
               <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #FFD700, #FF8C00)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
@@ -383,7 +536,9 @@ export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height 
 export function FloatingChat() {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ x: 30, y: 30 });
+  const [size, setSize] = useState({ width: 700, height: 650 }); // Default size
   const [isDrag, setIsDrag] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
   const [dynOpts, setDynOpts] = useState<Options | null>(null);
 
@@ -407,6 +562,39 @@ export function FloatingChat() {
     setTimeout(() => setIsDrag(false), 50);
   }, [onMove]);
 
+  const onResize = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+
+    const dx = startRef.current.x - e.clientX;
+    const dy = startRef.current.y - e.clientY;
+    setSize(prev => {
+      const newWidth = prev.width + dx;
+      const newHeight = prev.height + dy;
+      return {
+        // SET MINIMUMS HERE (e.g., 350px width, 400px height)
+        width: newWidth < 350 ? 350 : newWidth,
+        height: newHeight < 400 ? 400 : newHeight
+      };
+    });
+    startRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const onUpResize = useCallback(() => {
+    document.removeEventListener('mousemove', onResize);
+    document.removeEventListener('mouseup', onUpResize);
+    setIsResizing(false);
+  }, [onResize]);
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    startRef.current = { x: e.clientX, y: e.clientY };
+    document.addEventListener('mousemove', onResize);
+    document.addEventListener('mouseup', onUpResize);
+  };
+
+  const [isHovered, setIsHovered] = useState(false); // 1. Add this state
   if (!dynOpts) return null;
 
   return (
@@ -415,20 +603,134 @@ export function FloatingChat() {
       <div
         onMouseDown={e => { startRef.current = { x: e.clientX, y: e.clientY }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }}
         onClick={() => !isDrag && setOpen(!open)}
-        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 74, height: 74, borderRadius: '50%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 60, height: 60, borderRadius: '25%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
       >
+      {/* 3. The Tooltip Element */}
+      {isHovered && !open && !isDrag && (
+        <div style={{
+          position: 'absolute',
+          top: '-45px', // Positioned above the button
+          right: '20%',
+          backgroundColor: '#16181d',
+          color: '#FFD700',
+          padding: '6px 12px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          whiteSpace: 'nowrap',
+          border: '1px solid #FFD700',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          Aetna SRE Assistant
+          {/* Small triangle arrow at the bottom of tooltip */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-6px',
+            left: '85%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid #FFD700'
+          }} />
+        </div>
+        )}
         <div className={`button-icon ${open ? 'button-open' : ''}`}>
-          {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> : <span style={{ fontSize: 32 }}>🤖</span>}
+          {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> :  (
+        <img
+          src={robotIcon}
+          alt="Robot Icon"
+          style={{ width: 60, height: 75 }}
+        />
+      )}
         </div>
       </div>
 
       {/* The Chat Window Wrapper */}
       <div
         className={`chat-container ${open ? 'chat-container-open' : ''}`}
-        style={{ position: 'fixed', right: pos.x, bottom: pos.y + 90, width: '700px', height: '650px', zIndex: 10000 }}
+        style={{
+          position: 'fixed',
+          right: pos.x,
+          bottom: pos.y + 90,
+          width: size.width,
+          height: size.height,
+          zIndex: 10000,
+          /*
+             Logic:
+             1. If resizing: 'none' (instant response)
+             2. If opening/closing: 'all 0.4s ...' (bouncy animation)
+          */
+          transition: isResizing
+            ? 'none'
+            : 'opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.2s ease, height 0.2s ease',
+
+          /* Ensure the window is always visible during the transition */
+          visibility: open || isResizing ? 'visible' : 'hidden',
+          pointerEvents: open ? 'auto' : 'none',
+          overflow: 'visible'
+        }}
       >
+        {/* The Resize Handle */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsResizing(true);
+            startRef.current = { x: e.clientX, y: e.clientY };
+
+            const onMove = (me: MouseEvent) => {
+              const dx = startRef.current.x - me.clientX;
+              const dy = startRef.current.y - me.clientY;
+
+              setSize(prev => ({
+                width: Math.max(350, prev.width + dx),  // Minimum Width 350px
+                height: Math.max(400, prev.height + dy) // Minimum Height 400px
+              }));
+              startRef.current = { x: me.clientX, y: me.clientY };
+            };
+            const onUp = () => {
+              setIsResizing(false);
+              document.removeEventListener('mousemove', onMove);
+              document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+          }}
+          style={{
+            position: 'absolute',
+            top: -3,      // Offset out from the container
+            left: -3,     // Offset out from the container
+            width: 24,
+            height: 24,
+            cursor: 'nwse-resize',
+            zIndex: 10006,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'flex-start'
+          }}
+          // Slight hover effect to show it's interactive
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+        {/* Visual "Handle" Icon */}
+        {/* The Visual Bracket */}
+        <div style={{
+          width: 14,
+          height: 14,
+          borderTop: '3px solid #FFD700',
+          borderLeft: '3px solid #FFD700',
+          borderRadius: '2px 0 0 0',
+          filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.8))' // Adds contrast against dark backgrounds
+        }} />
+        </div>
         {dynOpts.apiUrl ? (
-          <FloatingWindow height={650} options={dynOpts} width={462} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
+          <FloatingWindow height={size.height} options={dynOpts} width={size.width} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
         ) : (
           <div style={{ background: '#1c1e24', color: '#fff', padding: 20, borderRadius: 16, border: '1px solid #444', height: '100%' }}>
             <h3>Settings Required</h3>
