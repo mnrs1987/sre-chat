@@ -3,7 +3,7 @@ import { PanelProps } from '@grafana/data';
 import { Button, Input, Spinner, Select } from '@grafana/ui';
 import { getBackendSrv } from '@grafana/runtime';
 import { config } from '@grafana/runtime';
-import robotIcon from '../img/plugin.png'; // adjust filename as needed
+import robotIcon from '../img/opening_icon.png'; // adjust filename as needed
 
 // Accessing the user details
 const currentUser = config.bootData.user;
