@@ -77,7 +77,7 @@ const TypingText: React.FC<{
 };
 
 // --- Main Window ---
-export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: boolean) => void }> = ({ options, height, setOpen }) => {
+export const FloatingWindow: React.FC<PanelProps<Options>> = ({ options, height }) => {
 
   const userName = config.bootData.user.name || config.bootData.user.login || 'User';
   // Capitalize first letter
@@ -402,50 +402,32 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
         borderRadius: '16px 16px 0 0'
         }}>
         {/* Empty div to help center the title */}
-        {/* NEW CHAT (+) - Left Aligned */}
-        <div style={{ width: '32px', display: 'flex', justifyContent: 'flex-start' }}>
-          <button
-            onClick={resetChat}
-            title="New Chat"
-            style={{
-              background: 'rgba(0,0,0,0.1)',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-        </div>
+        <div style={{ width: 24 }} />
+
         <span style={{ fontWeight: 'bold' }}>AETNA SRE Assistant</span>
-        {/* CLOSE BUTTON: Rounded on the Right (Triggers state in FloatingChat) */}
-        {/* CLOSE (X) - Right Aligned */}
-        <div style={{ width: '32px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => setOpen(false)}
-            title="Close"
-            style={{
-              background: 'rgba(0,0,0,0.1)',
-              border: 'none',
-              borderRadius: '50%',
-              cursor: 'pointer',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>✕</span>
-          </button>
-        </div>
+        <button
+          onClick={resetChat}
+          title="New Chat"
+          style={{
+            background: 'rgba(0,0,0,0.1)',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
+        >
+          {/* Simple "Plus" or "Refresh" Icon */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
         </div>
 
         <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -669,7 +651,7 @@ export function FloatingChat() {
         onClick={() => !isDrag && setOpen(!open)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 60, height: 60, zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
+        style={{ position: 'fixed', right: pos.x, bottom: pos.y, width: 60, height: 60, borderRadius: '25%', zIndex: 10001, cursor: isDrag ? 'grabbing' : 'grab', background: 'linear-gradient(135deg, #FFD700, #FF8C00)', boxShadow: '0 8px 32px rgba(255,165,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' }}
       >
       {/* 3. The Tooltip Element */}
       {isHovered && !open && !isDrag && (
@@ -691,13 +673,28 @@ export function FloatingChat() {
         }}>
           Aetna SRE Assistant
           {/* Small triangle arrow at the bottom of tooltip */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-6px',
+            left: '85%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid #FFD700'
+          }} />
         </div>
         )}
+        <div className={`button-icon ${open ? 'button-open' : ''}`}>
+          {open ? <span style={{ fontSize: 24, fontWeight: 'bold', color: '#000' }}>✕</span> :  (
         <img
           src={robotIcon}
           alt="Robot Icon"
-          style={{ width: 100, height: 110 }}
+          style={{ width: 60, height: 75 }}
         />
+      )}
+        </div>
       </div>
 
       {/* The Chat Window Wrapper */}
@@ -779,7 +776,7 @@ export function FloatingChat() {
         }} />
         </div>
         {dynOpts.apiUrl ? (
-          <FloatingWindow height={size.height} options={dynOpts} setOpen={setOpen} width={size.width} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
+          <FloatingWindow height={size.height} options={dynOpts} width={size.width} data={{} as any} timeRange={{} as any} timeZone="browser" optionsStyle={{} as any} renderToken={0} id={1} title="" eventBus={{} as any} fieldConfig={{} as any} onChangeTimeRange={() => {}} onFieldConfigChange={() => {}} onOptionsChange={() => {}} replaceVariables={s => s} transparent={false} />
         ) : (
           <div style={{ background: '#1c1e24', color: '#fff', padding: 20, borderRadius: 16, border: '1px solid #444', height: '100%' }}>
             <h3>Settings Required</h3>
