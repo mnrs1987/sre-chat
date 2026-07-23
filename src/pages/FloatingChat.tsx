@@ -148,6 +148,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
     }
     }, [loading, isTyping, messages]);
 
+
   // --- Updated handleSend in FloatingWindow ---
   const handleSend = async (val?: string) => {
   const query = val || input;
@@ -598,19 +599,43 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 };
 
 export function FloatingChat() {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ x: 30, y: 30 });
-  const [size, setSize] = useState({ width: 700, height: 650 }); // Default size
+  const [open, setOpen] = useState(() => {
+      const savedState = localStorage.getItem('aetna_sre_window_open');
+      return savedState === 'true'; // Convert string to boolean
+    });
+    // For Position
+  const [pos, setPos] = useState(() => {
+    const savedPos = localStorage.getItem('aetna_sre_window_pos');
+    return savedPos ? JSON.parse(savedPos) : { x: 30, y: 30 };
+  });
+  // For Size
+  const [size, setSize] = useState(() => {
+    const savedSize = localStorage.getItem('aetna_sre_window_size');
+    return savedSize ? JSON.parse(savedSize) : { width: 700, height: 650 };
+  });
   const [isDrag, setIsDrag] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
   const [dynOpts, setDynOpts] = useState<Options | null>(null);
+
+
 
   useEffect(() => {
     getBackendSrv().get(`/api/plugins/sre-assistant-app/settings`)
       .then(res => setDynOpts(res.jsonData))
       .catch(() => setDynOpts({ apiUrl: '' } as Options));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('aetna_sre_window_open', open.toString());
+  }, [open]);
+  // Add effects to save them
+  useEffect(() => {
+    localStorage.setItem('aetna_sre_window_pos', JSON.stringify(pos));
+  }, [pos]);
+  useEffect(() => {
+    localStorage.setItem('aetna_sre_window_size', JSON.stringify(size));
+  }, [size]);
 
   const onMove = useCallback((e: MouseEvent) => {
     const dx = startRef.current.x - e.clientX;
