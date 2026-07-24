@@ -1,0 +1,548 @@
+event: start
+data: {"type":"start","data":{"provider":"azure_openai","model":"exai-gpt-4.1"},"ts":"2026-07-24T16:12:32.470676+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Thinking…","stage":"thinking"},"ts":"2026-07-24T16:12:32.470941+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Disambiguating request…","stage":"disambiguation"},"ts":"2026-07-24T16:12:32.471078+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Routing to tenant 'otel-tenant' (QA)","stage":"disambiguation"},"ts":"2026-07-24T16:12:35.309602+00:00"}
+
+event: thinking
+data: {"type":"thinking","data":{"text":"Interpreted request as: For application AVAmember, fetch 1 error-level log line from the last 1 hour and print it verbatim."},"ts":"2026-07-24T16:12:35.309749+00:00"}
+
+event: thinking
+data: {"type":"thinking","data":{"text":"'AVAmember' → AVAMember (On Premise) ⇒ tenant 'otel-tenant'. Using tenant 'otel-tenant'. Stage: QA."},"ts":"2026-07-24T16:12:35.309876+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Planning approach…","stage":"planning"},"ts":"2026-07-24T16:12:35.309985+00:00"}
+
+event: thinking
+data: {"type":"thinking","data":{"text":"Intent: Retrieve exactly one verbatim error-level log line for the AVAMember application from the last 1 hour in QA, checking alternate app terms if needed.\nCapability: Loki\nPlan:\n  1. DisambiguationAgent: Resolve app \"AVAMember\" to its catalog tenant with deployment stage QA (explicitly provided; app environment noted as On Premise). Rewrite the request to target the resolved tenant/stage without embedding stage text into the query; retain alternate terms \"ava-member\" and \"avamember\" for selector refinement.\n  2. QueryAgent: loki_list_labels() — discover available log labels for the resolved tenant/stage before constructing selectors.\n  3. QueryAgent: loki_label_values(\"app\") — check whether an application label exists and whether it contains \"AVAMember\", \"ava-member\", or \"avamember\".\n  4. QueryAgent: loki_label_values(\"application\") — check common alternate app label.\n  5. QueryAgent: loki_label_values(\"service\") — check common alternate service label.\n  6. QueryAgent: loki_label_values(\"job\") — check whether logs are keyed by job name instead of app/service.\n  7. QueryAgent: loki_query_logs(query='{app=\"AVAMember\"} |= \"ERROR\"', limit=1) — first attempt if label discovery confirms app label and exact value; request one matching error log line from the last 1 hour at the pipeline’s resolved tenant/stage/time range.\n  8. QueryAgent: loki_query_logs(query='{app=\"AVAMember\"} |~ \"(?i)\\\\berror\\\\b|\\\\bexception\\\\b|\\\\bfailed\\\\b\"', limit=1) — broaden textual error matching if strict \"ERROR\" returns nothing.\n  9. QueryAgent: loki_query_logs(query='{app=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry using alternate app terms if supported by discovered label values.\n  10. QueryAgent: loki_query_logs(query='{application=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry on application label if app label is absent or empty.\n  11. QueryAgent: loki_query_logs(query='{service=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry on service label if needed.\n  12. QueryAgent: loki_query_logs(query='{job=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry on job label if needed.\n  13. ResponseAgent: Return exactly one verbatim log line found within the last 1 hour for AVAMember in QA, concise and grounded, citing the exact Loki query used and the resolved label selector as the source.\nFallback: If no data is returned, run refinement loop: use loki_list_labels() plus loki_label_values on additional common labels (e.g. \"container\", \"container_name\", \"pod\", \"kubernetes_pod_name\", \"filename\", \"namespace\") to identify how AVAMember is labeled; then retry with a broader selector such as '{service=~\".*ava.*|.*member.*\"} |~ \"(?i)\\\\berror\\\\b|\\\\bexception\\\\b|\\\\bfailed\\\\b\"' bounded to one result from the last 1 hour, and finally respond that no matching error log was found if all bounded retries return empty."},"ts":"2026-07-24T16:12:44.047572+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Planning data retrieval…","stage":"planning"},"ts":"2026-07-24T16:12:44.047879+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Querying Loki: loki_list_labels","stage":"tool"},"ts":"2026-07-24T16:12:44.669122+00:00"}
+
+event: tool_call_end
+data: {"type":"tool_call_end","data":{"id":"call_1yo9BduyUFxIWIABQCgMSmGe","name":"loki_list_labels","arguments":{}},"ts":"2026-07-24T16:12:44.669272+00:00"}
+
+event: tool_result
+data: {"type":"tool_result","data":{"id":"call_1yo9BduyUFxIWIABQCgMSmGe","name":"loki_list_labels","output":{"labels":["ApiName","ApplicationName","BrowserType","EventType","PageAppName","PageName","WorkFlow","__stream_shard__","application","component","domain","env","host_name","level","service_name","version"],"count":16}},"ts":"2026-07-24T16:12:44.902072+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Querying Loki: loki_label_values","stage":"tool"},"ts":"2026-07-24T16:12:45.685980+00:00"}
+
+event: tool_call_end
+data: {"type":"tool_call_end","data":{"id":"call_iP0ZAALXIqfQpXSevRAiPiiT","name":"loki_label_values","arguments":{"label":"application"}},"ts":"2026-07-24T16:12:45.686120+00:00"}
+
+event: tool_result
+data: {"type":"tool_result","data":{"id":"call_iP0ZAALXIqfQpXSevRAiPiiT","name":"loki_label_values","output":{"label":"application","values":["AVA","AVAMember","AVAProvider","AetnaQuotingCenter","BTSS","DocFind","DocumentInquiryv1","EDI-Gateway","EI-Claims","EINetworkandProvider","MBUEdifecsEncounters","MedicaidWebPortal","MobiusView","ProducerWorld","QA_Aet_HRP","VirtualViewer","YAVA","ePublishing"],"count":18}},"ts":"2026-07-24T16:12:45.719697+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Querying Loki: loki_label_values","stage":"tool"},"ts":"2026-07-24T16:12:45.719869+00:00"}
+
+event: tool_call_end
+data: {"type":"tool_call_end","data":{"id":"call_WTfNCIsrCgOJfZRZy6xpQFKw","name":"loki_label_values","arguments":{"label":"ApplicationName"}},"ts":"2026-07-24T16:12:45.720001+00:00"}
+
+event: tool_result
+data: {"type":"tool_result","data":{"id":"call_WTfNCIsrCgOJfZRZy6xpQFKw","name":"loki_label_values","output":{"label":"ApplicationName","values":["AVAOptout","CEC","CPQ","GPS","MBUHIP","MEDICAID","MarkLogicCustomAdaptor_IPP","MarkLogicCustomAdaptor_MDH","MedCompass","OneCM","Other","Stars Central"],"count":12}},"ts":"2026-07-24T16:12:45.753574+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Querying Loki: loki_label_values","stage":"tool"},"ts":"2026-07-24T16:12:45.753762+00:00"}
+
+event: tool_call_end
+data: {"type":"tool_call_end","data":{"id":"call_zjAmaFgStKN13K2FF9JKZ4go","name":"loki_label_values","arguments":{"label":"service_name"}},"ts":"2026-07-24T16:12:45.753902+00:00"}
+
+event: tool_result
+data: {"type":"tool_result","data":{"id":"call_zjAmaFgStKN13K2FF9JKZ4go","name":"loki_label_values","output":{"label":"service_name","values":["BTSS","DseWS","TrxServlet","TrxServlet2"],"count":4}},"ts":"2026-07-24T16:12:45.788958+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Querying Loki: loki_query_logs","stage":"tool"},"ts":"2026-07-24T16:12:46.637562+00:00"}
+
+event: tool_call_end
+data: {"type":"tool_call_end","data":{"id":"call_aQxiWFYmd4l1obg950HSIvk1","name":"loki_query_logs","arguments":{"query":"{application=\"AVAMember\"} |= \"ERROR\"","limit":1}},"ts":"2026-07-24T16:12:46.637711+00:00"}
+
+event: tool_result
+data: {"type":"tool_result","data":{"id":"call_aQxiWFYmd4l1obg950HSIvk1","name":"loki_query_logs","output":{"query":"{application=\"AVAMember\"} |= \"ERROR\"","count":0,"entries":[]}},"ts":"2026-07-24T16:12:46.702311+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Querying Loki: loki_query_logs","stage":"tool"},"ts":"2026-07-24T16:12:47.565146+00:00"}
+
+event: tool_call_end
+data: {"type":"tool_call_end","data":{"id":"call_nR1C9cn4AnF5Kq5AjxH0JM5N","name":"loki_query_logs","arguments":{"query":"{application=\"AVAMember\"} |~ \"(?i)\\\\berror\\\\b|\\\\bexception\\\\b|\\\\bfailed\\\\b\"","limit":1}},"ts":"2026-07-24T16:12:47.565304+00:00"}
+
+event: tool_result
+data: {"type":"tool_result","data":{"id":"call_nR1C9cn4AnF5Kq5AjxH0JM5N","name":"loki_query_logs","output":{"query":"{application=\"AVAMember\"} |~ \"(?i)\\\\berror\\\\b|\\\\bexception\\\\b|\\\\bfailed\\\\b\"","count":1,"entries":[{"timestamp":"2026-07-24T16:08:08.297000+00:00","line":"[155432591] LookupMemberData.executeRule: AVA System exception calling delegate: com.aetna.health.ava.avaCommon.exception.AVADatabaseException: EntitlementService:getEntitlements : Unknown error code returned from entitlements REST API, response is null","labels":{"application":"AVAMember","component":"AVAMember","detected_level":"ERROR","domain":"Channel","env":"qa","flags":"1","host_name":"xwasm2200q.ab.com","jvm":"cl_app2205_qa2_xwasm2200q","level":"ERROR","log_level":"info","melt":"apm","observed_timestamp":"1784909288297000000","process_command_line":"/websoft/IBMWebAS/java/8.0/jre/bin/java -Xoptionsfile=/websoft/IBMWebAS/java/8.0/jre/lib/amd64/compressedrefs/options.default -Xlockword:mode=default,noLockword=java/lang/String,noLockword=java/util/MapEntry,noLockword=java/util/HashMap$Entry,noLockword=org/apache/harmony/luni/util/ModifiedMap$Entry,noLockword=java/util/Hashtable$Entry,noLockword=java/lang/invoke/MethodType,noLockword=java/lang/invoke/MethodHandle,noLockword=java/lang/invoke/CollectHandle,noLockword=java/lang/invoke/ConstructorHandle,noLockword=java/lang/invoke/ConvertHandle,noLockword=java/lang/invoke/ArgumentConversionHandle,noLockword=java/lang/invoke/AsTypeHandle,noLockword=java/lang/invoke/ExplicitCastHandle,noLockword=java/lang/invoke/FilterReturnHandle,noLockword=java/lang/invoke/DirectHandle,noLockword=java/lang/invoke/ReceiverBoundHandle,noLockword=java/lang/invoke/DynamicInvokerHandle,noLockword=java/lang/invoke/FieldHandle,noLockword=java/lang/invoke/FieldGetterHandle,noLockword=java/lang/invoke/FieldSetterHandle,noLockword=java/lang/invoke/StaticFieldGetterHandle,noLockword=java/lang/invoke/StaticFieldSetterHandle,noLockword=java/lang/invoke/IndirectHandle,noLockword=java/lang/invoke/InterfaceHandle,noLockword=java/lang/invoke/VirtualHandle,noLockword=java/lang/invoke/PrimitiveHandle,noLockword=java/lang/invoke/InvokeExactHandle,noLockword=java/lang/invoke/InvokeGenericHandle,noLockword=java/lang/invoke/VarargsCollectorHandle,noLockword=java/lang/invoke/ThunkTuple -Djava.lang.stringBuffer.growAggressively=false -XX:+OriginalJDK8HeapSizeCompatibilityMode -XX:+LegacyXlogOption -XX:+EnsureHashed:java/lang/Class,java/lang/Thread -XX:+EnableExtendedHCR -Dcom.ibm.oti.vm.bootstrap.library.path=/websoft/IBMWebAS/java/8.0/jre/lib/amd64/compressedrefs:/websoft/IBMWebAS/java/8.0/jre/lib/amd64 -Dsun.boot.library.path=/websoft/IBMWebAS/java/8.0/jre/lib/amd64/compressedrefs:/websoft/IBMWebAS/java/8.0/jre/lib/amd64 -Djava.library.path=/websoft/IBMWebAS/java/8.0/jre/lib/amd64/compressedrefs:/websoft/IBMWebAS/java/8.0/jre/lib/amd64:/lib:/opt/Tivoli/itcam/dchome/7.2.0.0.15/toolkit/lib/lx8266:/opt/IBMWebAS/lib/native/linux/x86_64/:/opt/IBMWebAS/bin:/opt/IBMWebAS/lib/native/linux/x86_64/:/opt/IBMWebAS/bin:/opt/IBMWebAS/nulldllsdir:/usr/lib64:/usr/lib -Djava.home=/websoft/IBMWebAS/java/8.0/jre -Djava.ext.dirs=/websoft/IBMWebAS/java/8.0/jre/fips140-2/lib/ext:/websoft/IBMWebAS/java/8.0/jre/lib/ext -Duser.dir=/websoft/IBMWebAS/profiles/profileServer -Djava.class.path=. -Dosgi.install.area=/opt/IBMWebAS -Dwas.status.socket=12689 -Dosgi.configuration.area=/opt/IBMWebAS/profiles/profileServer/servers/cl_app2205_qa2_xwasm2200q/configuration -Djava.awt.headless=true -Dosgi.framework.extensions=com.ibm.cds,com.ibm.ws.eclipse.adaptors -Xshareclasses:name=webspherev9_8.0_64_%g,nonFatal -Dcom.ibm.xtq.processor.overrideSecureProcessing=true -Xcheck:dump -Djava.security.properties=/opt/IBMWebAS/properties/java.security -Djava.security.policy=/opt/IBMWebAS/properties/java.policy -Dcom.ibm.CORBA.ORBPropertyFilePath=/opt/IBMWebAS/properties -Xbootclasspath/p:/opt/IBMWebAS/java/8.0/jre/lib/ibmorb.jar -Djava.class.path=/opt/IBMWebAS/profiles/profileServer/properties:/opt/IBMWebAS/properties:/opt/IBMWebAS/lib/startup.jar:/opt/IBMWebAS/lib/bootstrap.jar:/opt/IBMWebAS/lib/lmproxy.jar:/opt/IBMWebAS/lib/urlprotocols.jar:/opt/IBMWebAS/deploytool/itp/batchboot.jar:/opt/IBMWebAS/deploytool/itp/batch2.jar:/opt/IBMWebAS/java/8.0/lib/tools.jar -Dibm.websphere.internalClassAccessMode=allow -verbose:gc -Xverbosegclog:/opt/IBMWebAS/profiles/profileServer/logs/cl_app2205_qa2_xwasm2200q/verbosegc.%seq.log,10,7000 -Xms256m -Xmx512m -Xcompressedrefs -Xscmaxaot16M -Xscmx120M -Dws.ext.dirs=/opt/IBMWebAS/java/8.0/lib:/opt/IBMWebAS/profiles/profileServer/classes:/opt/IBMWebAS/classes:/opt/IBMWebAS/lib:/opt/IBMWebAS/installedChannels:/opt/IBMWebAS/lib/ext:/opt/IBMWebAS/web/help:/opt/IBMWebAS/deploytool/itp/plugins/com.ibm.etools.ejbdeploy/runtime -Dderby.system.home=/opt/IBMWebAS/derby -Dcom.ibm.itp.location=/opt/IBMWebAS/bin -Djava.util.logging.configureByServer=true -Duser.install.root=/opt/IBMWebAS/profiles/profileServer -Djava.ext.dirs=/opt/IBMWebAS/tivoli/tam:/opt/IBMWebAS/javaext:/opt/IBMWebAS/java/8.0/jre/lib/ext -Djavax.management.builder.initial=com.ibm.ws.management.PlatformMBeanServerBuilder -Dpython.cachedir=/opt/IBMWebAS/profiles/profileServer/temp/cachedir -Dwas.install.root=/opt/IBMWebAS -Djava.util.logging.manager=com.ibm.ws.bootstrap.WsLogManager -Dserver.root=/opt/IBMWebAS/profiles/profileServer -Dcom.ibm.security.jgss.debug=off -Dcom.ibm.security.krb5.Krb5Debug=off -Dlogback.ContextSelector=JNDI -Dlog4j.repositorySelector=JNDI -Daelog.debug=false -Dlog4j.configuration=aefw-default-log4j.properties -Dlog4j.configuratorClass=com.aetna.framework.log.log4j.PropertyConfiguratorJ2EE -Dlog4j.debug=false -Dcom.ibm.ejs.sm.server.quiesceTimeout=30 -Dorg.apache.soap.util.net.SSLUtils.buildSSLSocket.timeout=30000 -Djava.net.preferIPv4Stack=true -Dfile.encoding=ISO-8859-1 -Dsun.rmi.transport.tcp.connectionPool=true -Dws.instrument=true -Dam.home=/opt/Tivoli/itcam/dchome/7.2.0.0.15/itcamdc -Dcom.ibm.tivoli.itcam.toolkit.ai.runtimebuilder.enable.rebuild=true -DITCAM_DC_ENABLED=true -Dotel.metrics.exporter=otlp -Dotel.traces.exporter=otlp -Dotel.logs.exporter=otlp -Dotel.exporter.otlp.protocol=http/protobuf -Dotel.exporter.otlp.endpoint=https://aetnainsights-otel-oci-qa.ab.com/ -Dotel.resource.attributes=domain=Channel,application=AVAMember,component=AVAMember,version=1.0.0,env=qa,melt=apm,jvm=cl_app2205_qa2_xwasm2200q -javaagent:/opt/AppDynamics/appserveragent/javaagent.jar -Xss1536K -Xgcpolicy:gencon -Xmn128m -javaagent:/etc/otelagent/opentelemetry-javaagent_v2.2.0.jar -Djava.library.path=/opt/IBMWebAS/lib/native/linux/x86_64/:/websoft/IBMWebAS/java/8.0/jre/lib/amd64/compressedrefs:/websoft/IBMWebAS/java/8.0/jre/lib/amd64:/opt/IBMWebAS/bin:/opt/IBMWebAS/bin:/opt/IBMWebAS/nulldllsdir:/usr/lib64:/usr/lib:/opt/mqm/java/lib64:/lib:/opt/Tivoli/itcam/dchome/7.2.0.0.15/toolkit/lib/lx8266: -Djava.endorsed.dirs=/opt/IBMWebAS/endorsed_apis:/opt/IBMWebAS/java/8.0/jre/lib/endorsed -Djava.security.auth.login.config=/opt/IBMWebAS/profiles/profileServer/properties/wsjaas.conf -Djava.security.policy=/opt/IBMWebAS/profiles/profileServer/properties/server.policy -Dsun.java.command=com.ibm.wsspi.bootstrap.WSPreLauncher -nosplash -application com.ibm.ws.bootstrap.WSLauncher com.ibm.ws.runtime.WsServer /opt/IBMWebAS/profiles/profileServer/config qaintcell20 xwasm2200q cl_app2205_qa2_xwasm2200q -Dsun.java.launcher=SUN_STANDARD -Dsun.java.launcher.pid=59375 com.ibm.wsspi.bootstrap.WSPreLauncher -nosplash -application com.ibm.ws.bootstrap.WSLauncher com.ibm.ws.runtime.WsServer /opt/IBMWebAS/profiles/profileServer/config qaintcell20 xwasm2200q cl_app2205_qa2_xwasm2200q","process_executable_path":"/websoft/IBMWebAS/java/8.0/jre/bin/java","process_pid":"59375","process_runtime_description":"IBM Corporation IBM J9 VM 2.9","process_runtime_name":"Java(TM) SE Runtime Environment","process_runtime_version":"8.0.8.60 - pxa6480sr8fp60-20260116_01(SR8 FP60)","scope_name":"Service","service_name":"unknown_service:java","severity_number":"17","severity_text":"ERROR","span_id":"1a288ee23b0ed96c","trace_id":"b46b04e07b093fd3f5a759f2a6208655","version":"1.0.0"}}]}},"ts":"2026-07-24T16:12:47.625596+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"🧭 Planner plan (debug)\n"},"ts":"2026-07-24T16:12:47.625975+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Intent: Retrieve exactly one verbatim error-level log line for the AVAMember application from the last 1 hour in QA, checking alternate app terms if needed.\nCapability: Loki\nPlan:\n  1. DisambiguationAgent: Resolve app \"AVAMember\" to its catalog tenant with deployment stage QA (explicitly provided; app environment noted as On Premise). Rewrite the request to target the resolved tenant/stage without embedding stage text into the query; retain alternate terms \"ava-member\" and \"avamember\" for selector refinement.\n  2. QueryAgent: loki_list_labels() — discover available log labels for the resolved tenant/stage before constructing selectors.\n  3. QueryAgent: loki_label_values(\"app\") — check whether an application label exists and whether it contains \"AVAMember\", \"ava-member\", or \"avamember\".\n  4. QueryAgent: loki_label_values(\"application\") — check common alternate app label.\n  5. QueryAgent: loki_label_values(\"service\") — check common alternate service label.\n  6. QueryAgent: loki_label_values(\"job\") — check whether logs are keyed by job name instead of app/service.\n  7. QueryAgent: loki_query_logs(query='{app=\"AVAMember\"} |= \"ERROR\"', limit=1) — first attempt if label discovery confirms app label and exact value; request one matching error log line from the last 1 hour at the pipeline’s resolved tenant/stage/time range.\n  8. QueryAgent: loki_query_logs(query='{app=\"AVAMember\"} |~ \"(?i)\\\\berror\\\\b|\\\\bexception\\\\b|\\\\bfailed\\\\b\"', limit=1) — broaden textual error matching if strict \"ERROR\" returns nothing.\n  9. QueryAgent: loki_query_logs(query='{app=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry using alternate app terms if supported by discovered label values.\n  10. QueryAgent: loki_query_logs(query='{application=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry on application label if app label is absent or empty.\n  11. QueryAgent: loki_query_logs(query='{service=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry on service label if needed.\n  12. QueryAgent: loki_query_logs(query='{job=~\"AVAMember|ava-member|avamember\"} |= \"ERROR\"', limit=1) — retry on job label if needed.\n  13. ResponseAgent: Return exactly one verbatim log line found within the last 1 hour for AVAMember in QA, concise and grounded, citing the exact Loki query used and the resolved label selector as the source.\nFallback: If no data is returned, run refinement loop: use loki_list_labels() plus loki_label_values on additional common labels (e.g. \"container\", \"container_name\", \"pod\", \"kubernetes_pod_name\", \"filename\", \"namespace\") to identify how AVAMember is labeled; then retry with a broader selector such as '{service=~\".*ava.*|.*member.*\"} |~ \"(?i)\\\\berror\\\\b|\\\\bexception\\\\b|\\\\bfailed\\\\b\"' bounded to one result from the last 1 hour, and finally respond that no matching error log was found if all bounded retries return empty.\n\n———\n\n"},"ts":"2026-07-24T16:12:47.626162+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Composing answer…","stage":"responding"},"ts":"2026-07-24T16:12:47.626414+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"-"},"ts":"2026-07-24T16:12:50.086056+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" The"},"ts":"2026-07-24T16:12:50.087479+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" application"},"ts":"2026-07-24T16:12:50.087970+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" **"},"ts":"2026-07-24T16:12:50.088291+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"AV"},"ts":"2026-07-24T16:12:50.088594+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"AM"},"ts":"2026-07-24T16:12:50.088874+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ember"},"ts":"2026-07-24T16:12:50.089317+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"**"},"ts":"2026-07-24T16:12:50.089631+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" exists"},"ts":"2026-07-24T16:12:50.089901+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" ("},"ts":"2026-07-24T16:12:50.090151+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"as"},"ts":"2026-07-24T16:12:50.090423+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" per"},"ts":"2026-07-24T16:12:50.090677+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" the"},"ts":"2026-07-24T16:12:50.091090+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" `"},"ts":"2026-07-24T16:12:50.091398+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"application"},"ts":"2026-07-24T16:12:50.091663+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"`"},"ts":"2026-07-24T16:12:50.091914+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" label"},"ts":"2026-07-24T16:12:50.092161+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":").\n"},"ts":"2026-07-24T16:12:50.092427+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"-"},"ts":"2026-07-24T16:12:50.092784+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" "},"ts":"2026-07-24T16:12:50.093052+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"1"},"ts":"2026-07-24T16:12:50.093322+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" error"},"ts":"2026-07-24T16:12:50.093583+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"-level"},"ts":"2026-07-24T16:12:50.093831+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" log"},"ts":"2026-07-24T16:12:50.094076+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" line"},"ts":"2026-07-24T16:12:50.094496+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" from"},"ts":"2026-07-24T16:12:50.094784+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" the"},"ts":"2026-07-24T16:12:50.095045+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" last"},"ts":"2026-07-24T16:12:50.095407+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" "},"ts":"2026-07-24T16:12:50.095677+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"1"},"ts":"2026-07-24T16:12:50.095927+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" hour"},"ts":"2026-07-24T16:12:50.096172+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" was"},"ts":"2026-07-24T16:12:50.096433+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" found"},"ts":"2026-07-24T16:12:50.096683+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" for"},"ts":"2026-07-24T16:12:50.097018+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" AV"},"ts":"2026-07-24T16:12:50.097294+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"AM"},"ts":"2026-07-24T16:12:50.097546+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ember"},"ts":"2026-07-24T16:12:50.097793+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":".\n\n"},"ts":"2026-07-24T16:12:50.098035+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"**"},"ts":"2026-07-24T16:12:50.098292+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Log"},"ts":"2026-07-24T16:12:50.098629+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" line"},"ts":"2026-07-24T16:12:50.098970+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" ("},"ts":"2026-07-24T16:12:50.099237+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ver"},"ts":"2026-07-24T16:12:50.099508+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"batim"},"ts":"2026-07-24T16:12:50.099759+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"):"},"ts":"2026-07-24T16:12:50.100003+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"**\n"},"ts":"2026-07-24T16:12:50.100359+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"``"},"ts":"2026-07-24T16:12:50.100630+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"`\n"},"ts":"2026-07-24T16:12:50.100878+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"["},"ts":"2026-07-24T16:12:50.101126+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"155"},"ts":"2026-07-24T16:12:50.101484+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"432"},"ts":"2026-07-24T16:12:50.101757+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"591"},"ts":"2026-07-24T16:12:50.102010+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"]"},"ts":"2026-07-24T16:12:50.102259+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" Lookup"},"ts":"2026-07-24T16:12:50.102621+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Member"},"ts":"2026-07-24T16:12:50.102885+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Data"},"ts":"2026-07-24T16:12:50.103137+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":".execute"},"ts":"2026-07-24T16:12:50.103407+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Rule"},"ts":"2026-07-24T16:12:50.103663+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":":"},"ts":"2026-07-24T16:12:50.103909+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" AV"},"ts":"2026-07-24T16:12:50.104394+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"A"},"ts":"2026-07-24T16:12:50.104638+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" System"},"ts":"2026-07-24T16:12:50.104894+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" exception"},"ts":"2026-07-24T16:12:50.105143+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" calling"},"ts":"2026-07-24T16:12:50.105409+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" delegate"},"ts":"2026-07-24T16:12:50.105661+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":":"},"ts":"2026-07-24T16:12:50.105909+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" com"},"ts":"2026-07-24T16:12:50.106152+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":".a"},"ts":"2026-07-24T16:12:50.106518+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"etna"},"ts":"2026-07-24T16:12:50.106794+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":".health"},"ts":"2026-07-24T16:12:50.107045+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"."},"ts":"2026-07-24T16:12:50.107309+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ava"},"ts":"2026-07-24T16:12:50.107651+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"."},"ts":"2026-07-24T16:12:50.107915+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ava"},"ts":"2026-07-24T16:12:50.108167+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Common"},"ts":"2026-07-24T16:12:50.108437+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":".exception"},"ts":"2026-07-24T16:12:50.108779+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":".A"},"ts":"2026-07-24T16:12:50.109070+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"V"},"ts":"2026-07-24T16:12:50.109339+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"AD"},"ts":"2026-07-24T16:12:50.109685+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"atabase"},"ts":"2026-07-24T16:12:50.109950+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Exception"},"ts":"2026-07-24T16:12:50.110197+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":":"},"ts":"2026-07-24T16:12:50.110464+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" Ent"},"ts":"2026-07-24T16:12:50.110715+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"itlement"},"ts":"2026-07-24T16:12:50.111049+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Service"},"ts":"2026-07-24T16:12:50.111333+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":":get"},"ts":"2026-07-24T16:12:50.111590+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"Ent"},"ts":"2026-07-24T16:12:50.111838+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"itlements"},"ts":"2026-07-24T16:12:50.112083+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" :"},"ts":"2026-07-24T16:12:50.112433+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" Unknown"},"ts":"2026-07-24T16:12:50.112700+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" error"},"ts":"2026-07-24T16:12:50.112951+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" code"},"ts":"2026-07-24T16:12:50.113193+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" returned"},"ts":"2026-07-24T16:12:50.113554+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" from"},"ts":"2026-07-24T16:12:50.113833+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" ent"},"ts":"2026-07-24T16:12:50.114086+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"itlements"},"ts":"2026-07-24T16:12:50.114357+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" REST"},"ts":"2026-07-24T16:12:50.114611+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" API"},"ts":"2026-07-24T16:12:50.114857+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":","},"ts":"2026-07-24T16:12:50.115196+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" response"},"ts":"2026-07-24T16:12:50.115479+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" is"},"ts":"2026-07-24T16:12:50.115826+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" null"},"ts":"2026-07-24T16:12:50.116090+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"\n"},"ts":"2026-07-24T16:12:50.116365+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"``"},"ts":"2026-07-24T16:12:50.116620+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"`\n\n"},"ts":"2026-07-24T16:12:50.116869+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"-"},"ts":"2026-07-24T16:12:50.117114+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" This"},"ts":"2026-07-24T16:12:50.117381+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" log"},"ts":"2026-07-24T16:12:50.117635+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" is"},"ts":"2026-07-24T16:12:50.117882+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" labeled"},"ts":"2026-07-24T16:12:50.118232+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" with"},"ts":"2026-07-24T16:12:50.118519+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" `"},"ts":"2026-07-24T16:12:50.118769+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"level"},"ts":"2026-07-24T16:12:50.119012+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":":"},"ts":"2026-07-24T16:12:50.119254+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" ERROR"},"ts":"2026-07-24T16:12:50.119520+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"`"},"ts":"2026-07-24T16:12:50.119769+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" and"},"ts":"2026-07-24T16:12:50.120010+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" `"},"ts":"2026-07-24T16:12:50.120253+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"env"},"ts":"2026-07-24T16:12:50.120518+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":":"},"ts":"2026-07-24T16:12:50.120864+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" qa"},"ts":"2026-07-24T16:12:50.121129+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"`.\n"},"ts":"2026-07-24T16:12:50.121393+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"-"},"ts":"2026-07-24T16:12:50.121645+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" No"},"ts":"2026-07-24T16:12:50.121887+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" alternate"},"ts":"2026-07-24T16:12:50.122130+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" application"},"ts":"2026-07-24T16:12:50.122386+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" names"},"ts":"2026-07-24T16:12:50.122636+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" ("},"ts":"2026-07-24T16:12:50.122887+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ava"},"ts":"2026-07-24T16:12:50.123136+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"-member"},"ts":"2026-07-24T16:12:50.123499+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":","},"ts":"2026-07-24T16:12:50.123775+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" av"},"ts":"2026-07-24T16:12:50.124026+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"am"},"ts":"2026-07-24T16:12:50.124272+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ember"},"ts":"2026-07-24T16:12:50.124550+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":")"},"ts":"2026-07-24T16:12:50.124891+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" were"},"ts":"2026-07-24T16:12:50.125155+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" found"},"ts":"2026-07-24T16:12:50.185297+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" in"},"ts":"2026-07-24T16:12:50.185741+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" the"},"ts":"2026-07-24T16:12:50.186023+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" label"},"ts":"2026-07-24T16:12:50.186476+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" values"},"ts":"2026-07-24T16:12:50.186767+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":";"},"ts":"2026-07-24T16:12:50.187028+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" only"},"ts":"2026-07-24T16:12:50.187302+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" \""},"ts":"2026-07-24T16:12:50.187565+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"AV"},"ts":"2026-07-24T16:12:50.187932+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"AM"},"ts":"2026-07-24T16:12:50.188200+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"ember"},"ts":"2026-07-24T16:12:50.188467+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"\""},"ts":"2026-07-24T16:12:50.188718+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" is"},"ts":"2026-07-24T16:12:50.188967+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":" present"},"ts":"2026-07-24T16:12:50.189337+00:00"}
+
+event: delta
+data: {"type":"delta","data":{"text":"."},"ts":"2026-07-24T16:12:50.189625+00:00"}
+
+event: usage
+data: {"type":"usage","data":{"prompt_tokens":3170,"completion_tokens":152,"total_tokens":3322},"ts":"2026-07-24T16:12:50.189989+00:00"}
+
+event: end
+data: {"type":"end","data":{"finish_reason":"stop"},"ts":"2026-07-24T16:12:50.190431+00:00"}
