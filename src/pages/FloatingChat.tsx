@@ -33,33 +33,33 @@ const TypingText: React.FC<{
   speed?: number;
   shouldAnimate?: boolean;
   isStreaming?: boolean;
-  isComplete?: boolean; // prop definition
+  isComplete?: boolean;
   onTypingProgress?: () => void;
 }> = ({ text = '', speed = 10, shouldAnimate = true, isStreaming = false, onTypingProgress, isComplete = false }) => {
   const [displayed, setDisplayed] = useState('');
   const indexRef = useRef(0);
 
   useEffect(() => {
-    // If it's already complete from history, don't animate, just show it
-    if (isComplete || !shouldAnimate || isStreaming) {
+    // NEW LOGIC: If we are streaming, don't use the interval.
+    // Just show the text raw as it arrives to prevent missing letters.
+    if (isStreaming || isComplete || !shouldAnimate) {
       setDisplayed(text);
       indexRef.current = text.length;
+      onTypingProgress?.();
       return;
     }
-    // Set up an interval to catch up to the current full 'text'
+    // Only use this for the Welcome Message or static responses
     const interval = setInterval(() => {
       if (indexRef.current < text.length) {
         setDisplayed((prev) => prev + text.charAt(indexRef.current));
         indexRef.current += 1;
         onTypingProgress?.();
-      } else if (!isStreaming) {
-        // Only clear the interval if the stream is finished
-        // AND we have reached the end of the text
+      } else {
         clearInterval(interval);
       }
     }, speed);
-
     return () => clearInterval(interval);
+    // Include 'text' in dependencies so the interval can see the growing string
   }, [text, shouldAnimate, isStreaming, speed, isComplete, onTypingProgress]);
 
   return (
@@ -75,6 +75,7 @@ const TypingText: React.FC<{
     </pre>
   );
 };
+
 
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: boolean) => void }> = ({ options, height, setOpen }) => {
@@ -452,9 +453,8 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
         <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.map((m) => {
           const isUser = !!m.isUser;
-          // If we are currently streaming this message, always show it
-          // otherwise, only show if it has text or is the welcome message
-          const shouldRender = isUser || m.id === 'welcome-msg' || m.text !== '' || m.isStreaming;
+
+          const shouldRender = isUser || m.id === 'welcome-msg' || m.text.length > 0;
           if (!shouldRender) {
             return null;
           }
@@ -515,6 +515,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                         onTypingProgress={scroll}
                         onTypingStart={() => setIsTyping(true)}
                         onTypingEnd={() => setIsTyping(false)}
+                        isStreaming={m.isStreaming} // Pass this correctly
                         isComplete={m.isComplete} // Pass the flag from the message object
                       />
                     )}
@@ -537,28 +538,20 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
             </div>
           );
           })}
-          {loading && (
-              <div style={{
-                color: '#FFD700',
-                fontSize: '13px',
-                paddingLeft: 10,
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '10px'
-              }}>
-                <div className="thinking-ring" />
-                <span className="thinking-text-gradient">
-                  {/*
-                    If the last message in the array is an assistant message
-                    AND it has started receiving text, show "typing".
-                    Otherwise, show "thinking".
-                  */}
-                  {messages[messages.length - 1]?.text !== '' && !messages[messages.length - 1]?.isUser
-                    ? 'Assistant is typing...'
-                    : 'Assistant is thinking...'}
-                </span>
-              </div>
-            )}
+          {/* This block is now visually at the top ONLY while waiting for the first word */}
+          {loading && messages[messages.length - 1]?.text === '' && (
+            <div style={{
+              color: '#FFD700',
+              fontSize: '13px',
+              paddingLeft: 10,
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '10px'
+            }}>
+              <div className="thinking-ring" />
+              <span className="thinking-text-gradient">Assistant is thinking...</span>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 8, background: '#16181d', borderTop: '1px solid #222', justifyContent: 'center' }}>
