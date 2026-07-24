@@ -17,6 +17,7 @@ interface Options {
   customHeaders?: string;
 }
 
+
 interface ChatMessage {
   id: string;
   text: string;
@@ -25,6 +26,7 @@ interface ChatMessage {
   isUser?: boolean;
   isStreaming?: boolean; // New flag to distinguish animation types
   isComplete?: boolean; // New flag
+  vote?: 'like' | 'dislike' | null; // Add this line
 }
 
 // --- Component: Typing Animation ---
@@ -116,6 +118,17 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
     }];
   });
 
+  const actionButtonStyle: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'transform 0.2s',
+  };
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -303,6 +316,32 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height, borderRadius: 16 }}>
       <style>{`
+        .action-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          transition: all 0.2s ease;
+          filter: grayscale(1);
+          opacity: 0.6;
+        }
+        .action-btn:hover {
+          filter: grayscale(0);
+          opacity: 1;
+          transform: scale(1.2);
+        }
+        .action-btn:active {
+          transform: scale(0.9);
+        }
+        /* Success flash animation for the copy button */
+        .copy-success {
+          animation: copyFlash 0.5s ease;
+        }
+        @keyframes copyFlash {
+          0% { filter: brightness(1); }
+          50% { filter: brightness(2); transform: scale(1.4); }
+          100% { filter: brightness(1); }
+        }
         /* Targets the plugin icon in the Grafana App/Plugin list settings */
         img[src*="sre-assistant-app/img/plugin.png"] {
           width: 120px !important;
@@ -328,7 +367,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
           overflow: visible !important;
         }
         @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 2.5s linear infinite; }
+        .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 1s linear infinite; }
         .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
         .p-select-menu, .css-1h9z7xy-menu .select-menu-container{ z-index: 99999 !important; }
 
@@ -459,84 +498,121 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
             return null;
           }
           return (
-            <div key={m.id} style={{
-              alignSelf: isUser ? 'flex-end' : 'flex-start',
-              maxWidth: '90%',
-              marginBottom: '12px'
-            }}>
-              <div style={{
-                display: 'flex',
-                gap: 10,
-                padding: '12px 16px',
-                /* THE KEY CHANGE: Asymmetrical border radius */
-                borderRadius: isUser ? '20px 20px 0px 20px' : '0px 20px 20px 20px',
-                background: isUser ? 'linear-gradient(135deg, #FFD700, #FF8C00)' : 'rgba(255,255,255,0.08)',
-                color: isUser ? '#000' : '#e0e0e0',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)'
+              <div key={m.id} style={{
+                alignSelf: isUser ? 'flex-end' : 'flex-start',
+                maxWidth: '90%',
+                marginBottom: '12px'
               }}>
-                {/* Icon Column */}
-                <div style={{ flexShrink: 0, marginTop: 4 }}>
-                  {isUser ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-                  ) : (
-                     <span style={{ fontSize: 24 }}>🤖</span>
-                  )}
-                </div>
-                {/* Text Column */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.65em', fontWeight: 'bold', marginBottom: 4, opacity: 0.7, letterSpacing: '0.5px' }}>
-                    {isUser ? 'YOU' : 'AETNA ASSISTANT'}
-                  </div>
-
-                  <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
-                    {m.isStreaming ? (
-                      /* For streaming, we display raw text but use a 'cursor' effect
-                       to mimic the typing animation feel */
-                       <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                         <TypingText
-                           key={m.id}
-                           text={m.text}
-                           // Only animate if it's an assistant message
-                           shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
-                           onTypingProgress={scroll}
-                           onTypingStart={() => setIsTyping(true)}
-                           onTypingEnd={() => setIsTyping(false)}
-                           isStreaming={m.isStreaming} // Pass this correctly
-                           isComplete={m.isComplete} // Pass the flag from the message object
-                         />
-                       </div>
+                <div style={{
+                  display: 'flex',
+                  gap: 10,
+                  padding: '12px 16px',
+                  borderRadius: isUser ? '20px 20px 0px 20px' : '0px 20px 20px 20px',
+                  background: isUser ? 'linear-gradient(135deg, #FFD700, #FF8C00)' : 'rgba(255,255,255,0.08)',
+                  color: isUser ? '#000' : '#e0e0e0',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  {/* Icon Column */}
+                  <div style={{ flexShrink: 0, marginTop: 4 }}>
+                    {isUser ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
                     ) : (
-                      <TypingText
-                        key={m.id}
-                        text={m.text}
-                        // Only animate if it's an assistant message
-                        shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
-                        onTypingProgress={scroll}
-                        onTypingStart={() => setIsTyping(true)}
-                        onTypingEnd={() => setIsTyping(false)}
-                        isStreaming={m.isStreaming} // Pass this correctly
-                        isComplete={m.isComplete} // Pass the flag from the message object
-                      />
+                      <span style={{ fontSize: 24 }}>🤖</span>
                     )}
                   </div>
 
-                  <div style={{
-                    fontSize: '10px',
-                    marginTop: 6,
-                    textAlign: 'right',
-                    // Change opacity to 0.8 and use #333 (bright black/charcoal) for user
-                    // and #aaa for the assistant.
-                    color: isUser ? '#333' : '#aaa',
-                    fontWeight: 'bolder',
-                    opacity: 1
-                  }}>
-                    {m.time}
+                  {/* Text Column */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.65em', fontWeight: 'bold', marginBottom: 4, opacity: 0.7, letterSpacing: '0.5px' }}>
+                      {isUser ? 'YOU' : 'AETNA ASSISTANT'}
+                    </div>
+
+                    <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                      <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                        <TypingText
+                          key={m.id}
+                          text={m.text}
+                          shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
+                          onTypingProgress={scroll}
+                          isStreaming={m.isStreaming}
+                          isComplete={m.isComplete}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Bar & Timestamp Wrapper */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: 8,
+                      borderTop: !isUser && !m.isStreaming && m.id !== 'welcome-msg' ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                      paddingTop: !isUser && !m.isStreaming && m.id !== 'welcome-msg' ? '6px' : '0'
+                    }}>
+                      {!isUser && !m.isStreaming && m.id !== 'welcome-msg' ? (
+                        <div style={{ display: 'flex', gap: 14 }}>
+                        <button
+                          className="action-btn"
+                          onClick={(e) => {
+                            navigator.clipboard.writeText(m.text);
+                            const btn = e.currentTarget;
+                            btn.classList.add('copy-success');
+                            setTimeout(() => btn.classList.remove('copy-success'), 500);
+                          }}
+                          title="Copy response"
+                        >
+                          📋
+                        </button>
+                        <button
+                          className="action-btn"
+                          style={{
+                            filter: m.vote === 'like' ? 'grayscale(0)' : 'grayscale(1)',
+                            opacity: m.vote === 'like' ? 1 : 0.6,
+                            transform: m.vote === 'like' ? 'scale(1.2)' : 'scale(1)'
+                          }}
+                          onClick={() => {
+                            setMessages(prev => prev.map(msg =>
+                              msg.id === m.id ? { ...msg, vote: msg.vote === 'like' ? null : 'like' } : msg
+                            ));
+                          }}
+                          title="Good Response"
+                        >
+                          👍
+                        </button>
+                        <button
+                          className="action-btn"
+                          style={{
+                            filter: m.vote === 'dislike' ? 'grayscale(0)' : 'grayscale(1)',
+                            opacity: m.vote === 'dislike' ? 1 : 0.6,
+                            transform: m.vote === 'dislike' ? 'scale(1.2)' : 'scale(1)'
+                          }}
+                          onClick={() => {
+                            setMessages(prev => prev.map(msg =>
+                              msg.id === m.id ? { ...msg, vote: msg.vote === 'dislike' ? null : 'dislike' } : msg
+                            ));
+                          }}
+                          title="Bad Response"
+                        >
+                          👎
+                        </button>
+                        </div>
+                      ) : (
+                        <div />
+                      )}
+                      <div style={{
+                        fontSize: '10px',
+                        color: isUser ? '#333' : '#aaa',
+                        fontWeight: 'bolder'
+                      }}>
+                        {m.time}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
+            );
+
           })}
           {/* This block is now visually at the top ONLY while waiting for the first word */}
           {loading && messages[messages.length - 1]?.text === '' && (
@@ -554,6 +630,18 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
           )}
         </div>
 
+        <div style={{
+          textAlign: 'center',
+          fontSize: '10px',
+          color: 'rgba(255,255,255,0.4)',
+          padding: '8px 0',
+          fontStyle: 'italic',
+          background: '#16181d', // Match the suggestions background
+          borderTop: '1px solid #222'
+        }}>
+          AETNA SRE Assistant is an AI and may make mistakes.
+        </div>
+
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 8, background: '#16181d', borderTop: '1px solid #222', justifyContent: 'center' }}>
           {['Why is the alert firing? What is the remeditation?', 'Which POD is causing high CPU?', 'Show all prod logs', 'What caused CPU spike yesterday?', 'Have we seen this issue before?'].map((s, i) => (
             <Button key={i} variant="secondary" size="sm" onClick={() => handleSend(s)} style={{ borderRadius: 8 }}>{s}</Button>
@@ -564,24 +652,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
           <div className="input-yellow-mesh" style={{ borderRadius: 12, padding: '2px' }}>
             <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative', overflow: 'visible' }}>
               <Input value={input} onChange={e => setInput(e.currentTarget.value)} placeholder="Type a query..." style={{ background: 'transparent', border: 'none', color: '#fff', flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleSend()} />
-              <Select
-                // This overrides the internal width logic
-                styles={{
-                  container: (base) => ({
-                    ...base,
-                    width: '180px', // Set to any pixel value or '100%'
-                    minWidth: '150px'
-                  }),
-                  menu: (base) => ({
-                    ...base,
-                    width: '200px', // You can make the dropdown menu wider than the box itself
-                  })
-                }}
-                options={modelOptions}
-                value={modelOptions.find(o => o.value === selectedModel)}
-                onChange={v => setSelectedModel(v.value!)}
-                menuPlacement="bottom"
-              />
+
               <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #FFD700, #FF8C00)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
           </div>
