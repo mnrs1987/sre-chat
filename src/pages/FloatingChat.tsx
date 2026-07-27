@@ -182,7 +182,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
     if (method === 'POST') {
       headers['Content-Type'] = 'application/json';
-      fetchOpts.body = JSON.stringify({ query: query, session_id: `sess-${Date.now()}` });
+      fetchOpts.body = JSON.stringify({ query: query, use_agents: true });
     } else {
       const sep = url.includes('?') ? '&' : '?';
       url = `${url}${sep}query=${encodeURIComponent(query)}&stream=true`;
