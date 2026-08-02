@@ -1,0 +1,27 @@
+event: trace
+data: {"type":"trace","data":{"trace_id":"64361c9744c0459f9b3a5d66dac5a109","run_id":null,"session_id":"ab355c6cb4724e1ca08f18d78f706ad5"},"ts":"2026-08-02T06:44:21.348201+00:00"}
+
+event: start
+data: {"type":"start","data":{"provider":"azure_openai","model":"exai-gpt-4.1"},"ts":"2026-08-02T06:44:21.448128+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Thinking…","stage":"thinking"},"ts":"2026-08-02T06:44:21.448666+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Disambiguating request…","stage":"disambiguation"},"ts":"2026-08-02T06:44:23.049108+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Routing to tenant 'otel-tenant' (QA)","stage":"disambiguation"},"ts":"2026-08-02T06:44:23.800790+00:00"}
+
+event: thinking
+data: {"type":"thinking","data":{"text":"No known application matched; defaulting to tenant 'otel-tenant'. Stage: QA."},"ts":"2026-08-02T06:44:23.801059+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Planning approach…","stage":"planning"},"ts":"2026-08-02T06:44:23.801276+00:00"}
+
+event: status
+data: {"type":"status","data":{"label":"Planning data retrieval…","stage":"planning"},"ts":"2026-08-02T06:44:24.491851+00:00"}
+
+event: error
+data: {"type":"error","data":{"message":"Query agent failed: ClientAuthenticationError: Microsoft Entra ID error '(invalid_client) AADSTS7000215: Invalid client secret provided. Ensure the secret being sent in the request is the client secret value, not the client secret ID, for a secret added to app '1f1583c7-1f49-45c6-831d-e09960f16f4c'. Trace ID: e25caf57-825d-4b8c-aaad-e27fcd5d0700 Correlation ID: 7cc369d3-96c2-4a4f-a3e0-209dc45caccd Timestamp: 2026-08-02 06:44:24Z'\nContent: {\"error\":\"invalid_client\",\"error_description\":\"AADSTS7000215: Invalid client secret provided. Ensure the secret being sent in the request is the client secret value, not the client secret ID, for a secret added to app '1f1583c7-1f49-45c6-831d-e09960f16f4c'. Trace ID: e25caf57-825d-4b8c-aaad-e27fcd5d0700 Correlation ID: 7cc369d3-96c2-4a4f-a3e0-209dc45caccd Timestamp: 2026-08-02 06:44:24Z\",\"error_codes\":[7000215],\"timestamp\":\"2026-08-02 06:44:24Z\",\"trace_id\":\"e25caf57-825d-4b8c-aaad-e27fcd5d0700\",\"correlation_id\":\"7cc369d3-96c2-4a4f-a3e0-209dc45caccd\",\"error_uri\":\"https://login.microsoftonline.com/error?code=7000215\"}","code":"query_agent_failed"},"ts":"2026-08-02T06:44:24.632439+00:00"}
+
