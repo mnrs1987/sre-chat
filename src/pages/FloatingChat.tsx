@@ -4,6 +4,7 @@ import { Button, Input, Spinner, Select } from '@grafana/ui';
 import { getBackendSrv } from '@grafana/runtime';
 import { config } from '@grafana/runtime';
 import robotIcon from '../img/opening_icon.png'; // adjust filename as needed
+import ReactMarkdown from 'react-markdown';
 
 // Accessing the user details
 const currentUser = config.bootData.user;
@@ -27,6 +28,7 @@ interface ChatMessage {
   isStreaming?: boolean; // New flag to distinguish animation types
   isComplete?: boolean; // New flag
   vote?: 'like' | 'dislike' | null; // Add this line
+  isError?: boolean;
 }
 
 // --- Component: Typing Animation ---
@@ -65,16 +67,36 @@ const TypingText: React.FC<{
   }, [text, shouldAnimate, isStreaming, speed, isComplete, onTypingProgress]);
 
   return (
-    <pre style={{
-      whiteSpace: 'pre-wrap',
-      margin: 0,
-      fontFamily: 'inherit',
-      fontSize: '13px',
-      display: 'block',
-      width: '100%'
-    }}>
-      {displayed}
-    </pre>
+    <div
+      style={{
+        margin: 0,
+        fontFamily: 'inherit',
+        fontSize: '13px',
+        width: '100%',
+        background: '#ffffff',
+        color: '#000000',
+        padding: '10px 12px',
+        borderRadius: '8px',
+        border: '1px solid #dcdcdc',
+        boxSizing: 'border-box',
+        lineHeight: '1.5'
+      }}
+    >
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{children}</p>,
+          ul: ({ children }) => <ul style={{ margin: '0 0 8px 18px' }}>{children}</ul>,
+          ol: ({ children }) => <ol style={{ margin: '0 0 8px 18px' }}>{children}</ol>,
+          code: ({ children }) => (
+            <code style={{ background: '#d3d3d3', color: '#000000', padding: '2px 4px', borderRadius: 4 }}>
+              {children}
+            </code>
+          ),
+        }}
+      >
+        {displayed}
+      </ReactMarkdown>
+    </div>
   );
 };
 
@@ -82,20 +104,24 @@ const TypingText: React.FC<{
 // --- Main Window ---
 export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: boolean) => void }> = ({ options, height, setOpen }) => {
 
+  const [showMenu, setShowMenu] = useState(false);
+
   const userName = config.bootData.user.name || config.bootData.user.login || 'User';
   // Capitalize first letter
   const capitalizedUser = userName.charAt(0).toUpperCase() + userName.slice(1);
   const resetChat = () => {
-    const initial = [{
-      id: 'welcome-msg',
-      text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
-      time: new Date().toLocaleTimeString(),
-      isUser: false,
-      isStreaming: false,
-    }];
-    setMessages(initial);
-    localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(initial));
-  };
+  const initial = [{
+    id: 'welcome-msg',
+    text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
+    time: new Date().toLocaleTimeString(),
+    isUser: false,
+    isStreaming: false,
+    isComplete: true,
+  }];
+  setMessages(initial);
+  setShowSuggestions(true);
+  localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(initial));
+};
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -129,12 +155,35 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
     justifyContent: 'center',
     transition: 'transform 0.2s',
   };
-
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4');
   const [animatedIds, setAnimatedIds] = useState<Set<string>>(new Set());
+
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const menuItemStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    color: '#fff',
+    textAlign: 'left',
+    padding: '10px 14px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    display: 'block'
+  };
 
   const chatRef = useRef<HTMLDivElement | null>(null);
   const timestamp = () => new Date().toLocaleTimeString();
@@ -167,7 +216,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
   const handleSend = async (val?: string) => {
   const query = val || input;
   if (!query.trim() || !options.apiUrl) return;
-
+  setShowSuggestions(false);
   const assistantMsgId = makeId();
   setMessages((p) => [...p, { id: makeId(), text: query, time: timestamp(), isUser: true }]);
   setLoading(true);
@@ -234,7 +283,28 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
           try {
             const json = JSON.parse(rawJson);
-
+            // Handle backend error event
+            if (json.type === 'error') {
+              const errorMessage =
+                json?.data?.message ||
+                'Something went wrong while processing your request.';
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? {
+                        ...msg,
+                        text: `**Error:** ${errorMessage}`,
+                        isStreaming: false,
+                        isComplete: true,
+                        isError: true,
+                      }
+                    : msg
+                )
+              );
+              setLoading(false);
+              setIsTyping(false);
+              return;
+            }
             // --- UPDATED FILTERING LOGIC ---
             // Only append text if it's the specific delta content.
             // Skip types like 'status', 'start', 'end', 'usage', etc.
@@ -344,7 +414,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
         }
         /* Targets the plugin icon in the Grafana App/Plugin list settings */
         img[src*="sre-assistant-app/img/plugin.png"] {
-          width: 120px !important;
+          width: 70px !important;
           height: auto !important;
           max-height: 120px !important;
           transform: scale(1.7); /* Bumps the size up 20% */
@@ -434,7 +504,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{
-        backgroundImage: 'linear-gradient(90deg, #FFD700, #FF8C00)',
+        backgroundImage: 'linear-gradient(90deg, #3ec6e6, #2096ef)',
         padding: '8px 16px',
         display: 'flex',
         alignItems: 'center',
@@ -444,27 +514,84 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
         }}>
         {/* Empty div to help center the title */}
         {/* NEW CHAT (+) - Left Aligned */}
-        <div style={{ width: '32px', display: 'flex', justifyContent: 'flex-start' }}>
+        <div style={{ width: '32px', display: 'flex', justifyContent: 'flex-start', position: 'relative' }} ref={menuRef}>
           <button
-            onClick={resetChat}
-            title="New Chat"
+            onClick={() => setShowMenu((prev) => !prev)}
+            title="Options"
             style={{
               background: 'rgba(0,0,0,0.1)',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              padding: '4px',
+              width: '28px',
+              height: '28px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              padding: 0
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <span style={{ display: 'block', width: '14px', height: '2px', background: '#000', borderRadius: '2px' }} />
+              <span style={{ display: 'block', width: '14px', height: '2px', background: '#000', borderRadius: '2px' }} />
+              <span style={{ display: 'block', width: '14px', height: '2px', background: '#000', borderRadius: '2px' }} />
+            </div>
           </button>
+
+          {showMenu && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '36px',
+                left: 0,
+                minWidth: '150px',
+                background: '#1f232a',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                zIndex: 1000,
+                overflow: 'hidden'
+              }}
+            >
+              <button
+                onClick={() => {
+                  resetChat();
+                  setShowMenu(false);
+                }}
+                style={menuItemStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                New Chat
+              </button>
+
+              <button
+                onClick={() => {
+                  console.log('History clicked');
+                  setShowMenu(false);
+                }}
+                style={menuItemStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                History
+              </button>
+
+              <button
+                onClick={() => {
+                  console.log('Settings clicked');
+                  setShowMenu(false);
+                }}
+                style={menuItemStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                Settings
+              </button>
+            </div>
+          )}
         </div>
+
         <span style={{ fontWeight: 'bold' }}>AETNA SRE Assistant</span>
         {/* CLOSE BUTTON: Rounded on the Right (Triggers state in FloatingChat) */}
         {/* CLOSE (X) - Right Aligned */}
@@ -497,6 +624,38 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
           if (!shouldRender) {
             return null;
           }
+          if (m.isError) {
+            return (
+              <div
+                key={m.id}
+                style={{
+                  alignSelf: 'center',
+                  maxWidth: '85%',
+                  marginBottom: '12px',
+                }}
+              >
+                <div
+                  style={{
+                    background: '#ffe5e5',
+                    color: '#b00020',
+                    border: '1px solid #ffb3b3',
+                    borderRadius: '14px',
+                    padding: '14px 18px',
+                    textAlign: 'center',
+                    boxShadow: '0 4px 12px rgba(255,0,0,0.12)',
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
+                    Error
+                  </div>
+                  <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                    {m.text}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           return (
               <div key={m.id} style={{
                 alignSelf: isUser ? 'flex-end' : 'flex-start',
@@ -508,7 +667,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                   gap: 10,
                   padding: '12px 16px',
                   borderRadius: isUser ? '20px 20px 0px 20px' : '0px 20px 20px 20px',
-                  background: isUser ? 'linear-gradient(135deg, #FFD700, #FF8C00)' : 'rgba(255,255,255,0.08)',
+                  background: isUser ? 'linear-gradient(135deg, #3ec6e6, #2096ef)' : 'rgba(255,255,255,0.08)',
                   color: isUser ? '#000' : '#e0e0e0',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)'
@@ -540,7 +699,45 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                         />
                       </div>
                     </div>
-
+                    {m.id === 'welcome-msg' && showSuggestions && (
+                      <div style={{ marginTop: 12 }}>
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: 'rgba(255,255,255,0.75)',
+                            marginBottom: 8
+                          }}
+                        >
+                          Suggestions
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 8
+                          }}
+                        >
+                          {[
+                            'Why is the alert firing? What is the remediation?',
+                            'Which POD is causing high CPU?',
+                            'Show all prod logs',
+                            'What caused CPU spike yesterday?',
+                            'Have we seen this issue before?'
+                          ].map((s, i) => (
+                            <Button
+                              key={i}
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleSend(s)}
+                              style={{ borderRadius: 8, backgroundColor: '#FFFFFF', color: '#000000' }}
+                            >
+                              {s}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {/* Action Bar & Timestamp Wrapper */}
                     <div style={{
                       display: 'flex',
@@ -630,31 +827,22 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
           )}
         </div>
 
-        <div style={{
-          textAlign: 'center',
-          fontSize: '10px',
-          color: 'rgba(255,255,255,0.4)',
-          padding: '8px 0',
-          fontStyle: 'italic',
-          background: '#16181d', // Match the suggestions background
-          borderTop: '1px solid #222'
-        }}>
-          AETNA SRE Assistant is an AI and may make mistakes.
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 8, background: '#16181d', borderTop: '1px solid #222', justifyContent: 'center' }}>
-          {['Why is the alert firing? What is the remeditation?', 'Which POD is causing high CPU?', 'Show all prod logs', 'What caused CPU spike yesterday?', 'Have we seen this issue before?'].map((s, i) => (
-            <Button key={i} variant="secondary" size="sm" onClick={() => handleSend(s)} style={{ borderRadius: 8 }}>{s}</Button>
-          ))}
-        </div>
-
         <div style={{ padding: 16, background: '#0e1014', borderRadius: '0 0 16px 16px' }}>
           <div className="input-yellow-mesh" style={{ borderRadius: 12, padding: '2px' }}>
             <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative', overflow: 'visible' }}>
               <Input value={input} onChange={e => setInput(e.currentTarget.value)} placeholder="Type a query..." style={{ background: 'transparent', border: 'none', color: '#fff', flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleSend()} />
 
-              <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #FFD700, #FF8C00)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
+              <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #3ec6e6, #2096ef)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
+          </div>
+          <div style={{
+            textAlign: 'center',
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.4)',
+            fontStyle: 'italic',
+            marginTop: '10px'
+          }}>
+            AETNA SRE Assistant is an AI and may make mistakes.
           </div>
         </div>
       </div>
@@ -785,7 +973,7 @@ export function FloatingChat() {
         <img
           src={robotIcon}
           alt="Robot Icon"
-          style={{ width: 100, height: 110 }}
+          style={{ width: 100, height: 90 }}
         />
       </div>
 
