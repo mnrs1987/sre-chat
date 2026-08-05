@@ -18,6 +18,12 @@ interface Options {
   customHeaders?: string;
 }
 
+interface ChatHistoryItem {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -105,23 +111,33 @@ const TypingText: React.FC<{
 export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: boolean) => void }> = ({ options, height, setOpen }) => {
 
   const [showMenu, setShowMenu] = useState(false);
-
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<ChatHistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('aetna_sre_chat_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const userName = config.bootData.user.name || config.bootData.user.login || 'User';
   // Capitalize first letter
   const capitalizedUser = userName.charAt(0).toUpperCase() + userName.slice(1);
   const resetChat = () => {
+  const newSessionId = `session-${Date.now()}`;
   const initial = [{
-    id: 'welcome-msg',
-    text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
-    time: new Date().toLocaleTimeString(),
-    isUser: false,
-    isStreaming: false,
-    isComplete: true,
-  }];
-  setMessages(initial);
-  setShowSuggestions(true);
-  localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(initial));
-};
+      id: 'welcome-msg',
+      text: `Hello ${capitalizedUser}! I'm your AETNA SRE Assistant. \nHow can I help you for metrics, logs and traces for today ?`,
+      time: new Date().toLocaleTimeString(),
+      isUser: false,
+      isStreaming: false,
+      isComplete: true,
+    }];
+    setMessages(initial);
+    setCurrentSessionId(newSessionId);
+    setShowSuggestions(true);
+    localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(initial));
+  };
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -144,6 +160,40 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
     }];
   });
 
+  const [currentSessionId, setCurrentSessionId] = useState(() => `session-${Date.now()}`);
+  useEffect(() => {
+    const nonWelcomeMessages = messages.filter((m) => m.id !== 'welcome-msg');
+    if (nonWelcomeMessages.length === 0) {
+      return;
+    }
+    const firstUserMessage = nonWelcomeMessages.find((m) => m.isUser)?.text?.trim() || 'New Chat';
+    setHistory((prev) => {
+      const historyItem: ChatHistoryItem = {
+        id: currentSessionId,
+        title: firstUserMessage.length > 40 ? `${firstUserMessage.slice(0, 40)}...` : firstUserMessage,
+        messages,
+        createdAt: new Date().toISOString(),
+      };
+      // Remove duplicates:
+      // 1. same session id
+      // 2. same title (optional protection if a new session repeats same first prompt)
+      const filtered = prev.filter(
+        (item) => item.id !== currentSessionId && item.title !== historyItem.title
+      );
+      const updated = [historyItem, ...filtered];
+      localStorage.setItem('aetna_sre_chat_history', JSON.stringify(updated));
+      return updated;
+    });
+  }, [messages, currentSessionId]);
+
+  const loadHistoryChat = (item: ChatHistoryItem) => {
+    setMessages(item.messages.map((m) => ({ ...m, isStreaming: false, isComplete: true })));
+    setCurrentSessionId(item.id);
+    setShowMenu(false);
+    setShowHistory(false);
+    localStorage.setItem('aetna_sre_persistent_messages', JSON.stringify(item.messages));
+  };
+
   const actionButtonStyle: React.CSSProperties = {
     background: 'none',
     border: 'none',
@@ -154,6 +204,19 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'transform 0.2s',
+  };
+
+  const menuItemStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    color: '#fff',
+    textAlign: 'left',
+    padding: '10px 14px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    display: 'block',
+    whiteSpace: 'nowrap',
+    width: '100%',
   };
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [input, setInput] = useState('');
@@ -172,18 +235,6 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const menuItemStyle: React.CSSProperties = {
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    color: '#fff',
-    textAlign: 'left',
-    padding: '10px 14px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    display: 'block'
-  };
 
   const chatRef = useRef<HTMLDivElement | null>(null);
   const timestamp = () => new Date().toLocaleTimeString();
@@ -285,15 +336,18 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
             const json = JSON.parse(rawJson);
             // Handle backend error event
             if (json.type === 'error') {
-              const errorMessage =
-                json?.data?.message ||
-                'Something went wrong while processing your request.';
+              const rawError = json?.data?.message || '';
+              let errorMessage = rawError;
+              if (rawError.includes('AADSTS7000215') || rawError.includes('invalid_client')) {
+                errorMessage =
+                  'Authentication failed. Invalid Microsoft client secret provided. Please check the app client secret configuration.';
+              }
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantMsgId
                     ? {
                         ...msg,
-                        text: `**Error:** ${errorMessage}`,
+                        text: `Error: ${errorMessage}`,
                         isStreaming: false,
                         isComplete: true,
                         isError: true,
@@ -375,8 +429,6 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
   }
 };
 
-
-
   const modelOptions = [
     { label: 'GPT-4', value: 'gpt-4' },
     { label: 'GPT-3.5', value: 'gpt-3.5' },
@@ -386,114 +438,131 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height, borderRadius: 16 }}>
       <style>{`
-        .action-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          transition: all 0.2s ease;
-          filter: grayscale(1);
-          opacity: 0.6;
-        }
-        .action-btn:hover {
-          filter: grayscale(0);
-          opacity: 1;
-          transform: scale(1.2);
-        }
-        .action-btn:active {
-          transform: scale(0.9);
-        }
-        /* Success flash animation for the copy button */
-        .copy-success {
-          animation: copyFlash 0.5s ease;
-        }
-        @keyframes copyFlash {
-          0% { filter: brightness(1); }
-          50% { filter: brightness(2); transform: scale(1.4); }
-          100% { filter: brightness(1); }
-        }
-        /* Targets the plugin icon in the Grafana App/Plugin list settings */
-        img[src*="sre-assistant-app/img/plugin.png"] {
-          width: 70px !important;
-          height: auto !important;
-          max-height: 120px !important;
-          transform: scale(1.7); /* Bumps the size up 20% */
-        }
-        /* This targets the portal created by menuShouldPortal */
-        div[class*="-MenuPortal"] {
-          z-index: 100002 !important;
-        }
-        /* Ensure the assistant window doesn't trap the menu */
-        .chat-container {
-          overflow: visible !important;
-        }
+            .action-btn {
+              background: none;
+              border: none;
+              cursor: pointer;
+              padding: 0;
+              transition: all 0.2s ease;
+              filter: grayscale(1);
+              opacity: 0.6;
+            }
+            .action-btn:hover {
+              filter: grayscale(0);
+              opacity: 1;
+              transform: scale(1.2);
+            }
+            .action-btn:active {
+              transform: scale(0.9);
+            }
+            /* Success flash animation for the copy button */
+            .copy-success {
+              animation: copyFlash 0.5s ease;
+            }
+            @keyframes copyFlash {
+              0% { filter: brightness(1); }
+              50% { filter: brightness(2); transform: scale(1.4); }
+              100% { filter: brightness(1); }
+            }
+            /* Targets the plugin icon in the Grafana App/Plugin list settings */
+            img[src*="sre-assistant-app/img/plugin.png"] {
+              width: 70px !important;
+              height: auto !important;
+              max-height: 120px !important;
+              transform: scale(1.7); /* Bumps the size up 20% */
+            }
+            /* This targets the portal created by menuShouldPortal */
+            div[class*="-MenuPortal"] {
+              z-index: 100002 !important;
+            }
+            /* Ensure the assistant window doesn't trap the menu */
+            .chat-container {
+              overflow: visible !important;
+            }
 
-        /* Force the portal to sit above your window */
-        .grafana-portal-container {
-          z-index: 100001 !important;
-        }
-        /* Ensure the select container itself isn't hiding overflow */
-        .input-yellow-mesh, .input-yellow-mesh > div {
-          overflow: visible !important;
-        }
-        @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 1s linear infinite; }
-        .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
-        .p-select-menu, .css-1h9z7xy-menu .select-menu-container{ z-index: 99999 !important; }
+            /* Force the portal to sit above your window */
+            .grafana-portal-container {
+              z-index: 100001 !important;
+            }
+            /* Ensure the select container itself isn't hiding overflow */
+            .input-yellow-mesh, .input-yellow-mesh > div {
+              overflow: visible !important;
+            }
+            @keyframes aiShiftFast { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+            .glow-mesh { background: linear-gradient(115deg, #ff375f, #ff9f0a, #ffd60a, #64d2ff, #5e5ce6, #bf5af2, #ff375f); background-size: 150% 150%; animation: aiShiftFast 1s linear infinite; }
+            .input-yellow-mesh { background: linear-gradient(90deg, #FFD700, #FF8C00, #FFE066, #FF9500, #FFD700); background-size: 200% auto; animation: aiShiftFast 2s linear infinite; }
+            .p-select-menu, .css-1h9z7xy-menu .select-menu-container{ z-index: 99999 !important; }
 
-        @keyframes rotateRainbow {
-          0% { transform: rotate(0deg); filter: hue-rotate(0deg); }
-          100% { transform: rotate(360deg); filter: hue-rotate(360deg); }
-        }
-        .thinking-ring {
-          width: 18px;
-          height: 18px;
-          border: 3px solid rgba(255, 255, 255, 0.1);
-          border-top: 3px solid #FFD700;
-          border-right: 3px solid #FF375F;
-          border-radius: 50%;
-          animation: rotateRainbow 1s linear infinite;
-          display: inline-block;
-          vertical-align: middle;
-          margin-right: 8px;
-        }
+            @keyframes rotateRainbow {
+              0% { transform: rotate(0deg); filter: hue-rotate(0deg); }
+              100% { transform: rotate(360deg); filter: hue-rotate(360deg); }
+            }
+            .thinking-ring {
+              width: 18px;
+              height: 18px;
+              border: 3px solid rgba(255, 255, 255, 0.1);
+              border-top: 3px solid #FFD700;
+              border-right: 3px solid #FF375F;
+              border-radius: 50%;
+              animation: rotateRainbow 1s linear infinite;
+              display: inline-block;
+              vertical-align: middle;
+              margin-right: 8px;
+            }
 
-        @keyframes thinkingGradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .thinking-text-gradient {
-          background: linear-gradient(90deg, #FFD700, #FF375F, #bf5af2, #64d2ff, #FFD700);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          animation: thinkingGradient 3s linear infinite;
-          font-weight: bold;
-          letter-spacing: 0.5px;
-        }
+            @keyframes thinkingGradient {
+              0% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+              100% { background-position: 0% 50%; }
+            }
+            .thinking-text-gradient {
+              background: linear-gradient(90deg, #FFD700, #FF375F, #bf5af2, #64d2ff, #FFD700);
+              background-size: 200% auto;
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              animation: thinkingGradient 3s linear infinite;
+              font-weight: bold;
+              letter-spacing: 0.5px;
+            }
 
-        /* Animation for the chat window container */
-        .chat-container {
-          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy fluid effect */
-          transform-origin: bottom right;
-          opacity: 0;
-          transform: scale(0.8) translateY(40px);
-          pointer-events: none;
-        }
-        .chat-container-open {
-          opacity: 1;
-          transform: scale(1) translateY(0);
-          pointer-events: auto;
-        }
-        /* Rotation and scaling for the button icon */
-        .button-icon {
-          transition: transform 0.3s ease;
-        }
-        .button-open {
-          transform: rotate(90deg) scale(0.8);
-        }
-              `}</style>
+            /* Animation for the chat window container */
+            .chat-container {
+              transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy fluid effect */
+              transform-origin: bottom right;
+              opacity: 0;
+              transform: scale(0.8) translateY(40px);
+              pointer-events: none;
+            }
+            .chat-container-open {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+              pointer-events: auto;
+            }
+            /* Rotation and scaling for the button icon */
+            .button-icon {
+              transition: transform 0.3s ease;
+            }
+            .button-open {
+              transform: rotate(90deg) scale(0.8);
+            }
+
+            .chat-input-wrap input,
+            .chat-input-wrap input:hover,
+            .chat-input-wrap input:focus,
+            .chat-input-wrap input:active {
+              border: none !important;
+              outline: none !important;
+              box-shadow: none !important;
+            }
+            .chat-input-wrap div,
+            .chat-input-wrap div:hover,
+            .chat-input-wrap div:focus,
+            .chat-input-wrap div:active {
+              box-shadow: none !important;
+              border: none !important;
+              outline: none !important;
+            }
+          `}</style>
 
       {(loading || isTyping) && (
         <>
@@ -502,7 +571,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
         </>
       )}
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid #736f6f' }}>
       <div style={{
         backgroundImage: 'linear-gradient(90deg, #3ec6e6, #2096ef)',
         padding: '8px 16px',
@@ -519,7 +588,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
             onClick={() => setShowMenu((prev) => !prev)}
             title="Options"
             style={{
-              background: 'rgba(0,0,0,0.1)',
+              background: 'rgba(255,255,255)',
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -544,13 +613,15 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                 position: 'absolute',
                 top: '36px',
                 left: 0,
-                minWidth: '150px',
+                width: 'max-content',
+                minWidth: '180px',
+                maxWidth: '420px',
                 background: '#1f232a',
                 border: '1px solid rgba(255,255,255,0.12)',
                 borderRadius: '10px',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                 zIndex: 1000,
-                overflow: 'hidden'
+                overflow: 'hidden',
               }}
             >
               <button
@@ -566,21 +637,55 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
               </button>
 
               <button
-                onClick={() => {
-                  console.log('History clicked');
-                  setShowMenu(false);
-                }}
+                onClick={() => setShowHistory((prev) => !prev)}
                 style={menuItemStyle}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 History
               </button>
-
+              {showHistory && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', maxHeight: '220px', overflowY: 'auto' }}>
+                    {history.length === 0 ? (
+                      <div style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                        No history yet
+                      </div>
+                    ) : (
+                      history.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => loadHistoryChat(item)}
+                          style={{
+                            ...menuItemStyle,
+                            borderTop: '1px solid rgba(255,255,255,0.08)',
+                            maxHeight: '220px',
+                            overflowY: 'auto',
+                            overflowX: 'auto',
+                            width: 'max-content',
+                            minWidth: '100%',
+                            paddingLeft: '24px',
+                            backgroundColor: 'black',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                            e.currentTarget.style.color = '#FFD700';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'black';
+                            e.currentTarget.style.color = 'rgba(255,255,255)';
+                          }}
+                          title={item.title}
+                        >
+                          {item.title}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               <button
                 onClick={() => {
-                  console.log('Settings clicked');
                   setShowMenu(false);
+                  window.location.href = '/plugins/sre-assistant-app';
                 }}
                 style={menuItemStyle}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
@@ -600,7 +705,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
             onClick={() => setOpen(false)}
             title="Close"
             style={{
-              background: 'rgba(0,0,0,0.1)',
+              background: '#FFFFFF',
               border: 'none',
               borderRadius: '50%',
               cursor: 'pointer',
@@ -829,8 +934,20 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
         <div style={{ padding: 16, background: '#0e1014', borderRadius: '0 0 16px 16px' }}>
           <div className="input-yellow-mesh" style={{ borderRadius: 12, padding: '2px' }}>
-            <div style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative', overflow: 'visible' }}>
-              <Input value={input} onChange={e => setInput(e.currentTarget.value)} placeholder="Type a query..." style={{ background: 'transparent', border: 'none', color: '#fff', flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleSend()} />
+            <div className="chat-input-wrap" style={{ background: '#0e1014', borderRadius: 10, display: 'flex', gap: 8, padding: '4px 8px', position: 'relative', overflow: 'visible'}}>
+            <Input value={input} onChange={(e) => setInput(e.currentTarget.value)} placeholder="Type a query..." onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSend();
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  border: 'none',
+                  outline: 'none',
+                  boxShadow: 'none',
+                  background: 'transparent'
+                }}
+                />
 
               <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #3ec6e6, #2096ef)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
@@ -865,12 +982,12 @@ export function FloatingChat() {
     const savedSize = localStorage.getItem('aetna_sre_window_size');
     return savedSize ? JSON.parse(savedSize) : { width: 700, height: 650 };
   });
+
+
   const [isDrag, setIsDrag] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
   const [dynOpts, setDynOpts] = useState<Options | null>(null);
-
-
 
   useEffect(() => {
     getBackendSrv().get(`/api/plugins/sre-assistant-app/settings`)
@@ -955,13 +1072,13 @@ export function FloatingChat() {
           top: '-45px', // Positioned above the button
           right: '20%',
           backgroundColor: '#16181d',
-          color: '#FFD700',
+          color: '#FFFFFF',
           padding: '6px 12px',
           borderRadius: '8px',
           fontSize: '12px',
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
-          border: '1px solid #FFD700',
+          border: '1px solid #2096ef',
           boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
           pointerEvents: 'none',
           animation: 'fadeIn 0.2s ease-out'
@@ -1049,8 +1166,6 @@ export function FloatingChat() {
         <div style={{
           width: 14,
           height: 14,
-          borderTop: '3px solid #FFD700',
-          borderLeft: '3px solid #FFD700',
           borderRadius: '2px 0 0 0',
           filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.8))' // Adds contrast against dark backgrounds
         }} />
