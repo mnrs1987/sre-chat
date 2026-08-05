@@ -682,17 +682,6 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                     )}
                   </div>
                 )}
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  window.location.href = '/plugins/sre-assistant-app';
-                }}
-                style={menuItemStyle}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              >
-                Settings
-              </button>
             </div>
           )}
         </div>
