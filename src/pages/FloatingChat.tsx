@@ -50,15 +50,12 @@ const TypingText: React.FC<{
   const indexRef = useRef(0);
 
   useEffect(() => {
-    // NEW LOGIC: If we are streaming, don't use the interval.
-    // Just show the text raw as it arrives to prevent missing letters.
     if (isStreaming || isComplete || !shouldAnimate) {
       setDisplayed(text);
       indexRef.current = text.length;
       onTypingProgress?.();
       return;
     }
-    // Only use this for the Welcome Message or static responses
     const interval = setInterval(() => {
       if (indexRef.current < text.length) {
         setDisplayed((prev) => prev + text.charAt(indexRef.current));
@@ -69,7 +66,6 @@ const TypingText: React.FC<{
       }
     }, speed);
     return () => clearInterval(interval);
-    // Include 'text' in dependencies so the interval can see the growing string
   }, [text, shouldAnimate, isStreaming, speed, isComplete, onTypingProgress]);
 
   return (
@@ -85,22 +81,29 @@ const TypingText: React.FC<{
         borderRadius: '8px',
         border: '1px solid #dcdcdc',
         boxSizing: 'border-box',
-        lineHeight: '1.5'
+        lineHeight: '1.4'
       }}
     >
-      <ReactMarkdown
-        components={{
-          p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{children}</p>,
-          ul: ({ children }) => <ul style={{ margin: '0 0 8px 18px' }}>{children}</ul>,
-          ol: ({ children }) => <ol style={{ margin: '0 0 8px 18px' }}>{children}</ol>,
-          code: ({ children }) => (
-            <code style={{ background: '#d3d3d3', color: '#000000', padding: '2px 4px', borderRadius: 4 }}>
-              {children}
-            </code>
-          ),
-        }}
+    <ReactMarkdown
+      components={{
+        p: ({ children }) => <p style={{ margin: '0 0 4px 0' }}>{children}</p>,
+        ul: ({ children }) => <ul style={{ margin: '0 0 4px 16px', paddingLeft: 0 }}>{children}</ul>,
+        ol: ({ children }) => <ol style={{ margin: '0 0 4px 16px', paddingLeft: 0 }}>{children}</ol>,
+        li: ({ children }) => <li style={{ margin: '0 0 2px 0' }}>{children}</li>,
+        // Add pre and code style rules to keep content within bounds
+        pre: ({ children }) => (
+          <pre style={{ maxWidth: '100%', overflowX: 'auto', background: '#1e1e1e', padding: '8px', borderRadius: '4px', margin: '6px 0' }}>
+            {children}
+          </pre>
+        ),
+        code: ({ children }) => (
+          <code style={{ background: '#d3d3d3', color: '#000000', padding: '2px 4px', borderRadius: 4, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+            {children}
+          </code>
+        ),
+      }}
       >
-        {displayed}
+      {displayed}
       </ReactMarkdown>
     </div>
   );
@@ -264,14 +267,203 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
 
   // --- Updated handleSend in FloatingWindow ---
-  const handleSend = async (val?: string) => {
+//   const handleSend = async (val?: string) => {
+//   const query = val || input;
+//   if (!query.trim() || !options.apiUrl) return;
+//   setShowSuggestions(false);
+//   const assistantMsgId = makeId();
+//   // setMessages((p) => [...p, { id: makeId(), text: query, time: timestamp(), isUser: true }]);
+//   // Inside handleSend where text/event-stream starts:
+//   setMessages((p) => [...p, { id: assistantMsgId, text: '', time: '', isStreaming: true }]);
+//   setLoading(true);
+//   setInput('');
+//
+//   try {
+//     const method = (options.method || 'POST').toUpperCase();
+//     const headers: Record<string, string> = { 'Accept': 'text/event-stream, application/json' };
+//
+//     let url = options.apiUrl;
+//     const fetchOpts: RequestInit = { method, headers, mode: 'cors' };
+//
+//     if (method === 'POST') {
+//       headers['Content-Type'] = 'application/json';
+//       fetchOpts.body = JSON.stringify({ query: query, use_agents: true });
+//     } else {
+//       const sep = url.includes('?') ? '&' : '?';
+//       url = `${url}${sep}query=${encodeURIComponent(query)}&stream=true`;
+//     }
+//
+//     const res = await fetch(url, fetchOpts);
+//     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+//
+//     const contentType = res.headers.get('content-type') || '';
+//
+//     if (contentType.includes('text/event-stream')) {
+//       const reader = res.body?.getReader();
+//       if (!reader) throw new Error('ReadableStream not supported');
+//
+//       setMessages((p) => [...p, { id: assistantMsgId, text: '', time: timestamp(), isStreaming: true }]);
+//       setLoading(true);
+//       setIsTyping(true);
+//       setAnimatedIds((prev) => new Set(prev).add(assistantMsgId));
+//
+//       const decoder = new TextDecoder();
+//       let fullStitchedText = '';
+//       let buffer = '';
+//
+//       while (true) {
+//         const { done, value } = await reader.read();
+//         if (done) {
+//           // 1. Mark the specific message as no longer streaming and add the final timestamp
+//           setMessages((prev) => prev.map((m) =>
+//             m.id === assistantMsgId ? {
+//               ...m,
+//               isStreaming: false,
+//               isComplete: true,
+//               time: timestamp() // <--- Assign timestamp here once complete!
+//             } : m
+//           ));
+//
+//           // 2. Kill the global loading state
+//           setLoading(false);
+//
+//           // 3. Ensure typing state is also cleared
+//           setIsTyping(false);
+//           break;
+//         }
+//
+//         buffer += decoder.decode(value, { stream: true });
+//         const lines = buffer.split('\n');
+//         buffer = lines.pop() || '';
+//
+//         for (const line of lines) {
+//           const trimmed = line.trim();
+//           if (!trimmed.startsWith('data:')) continue;
+//
+//           const rawJson = trimmed.replace(/^data:\s*/, '');
+//
+//           try {
+//             const json = JSON.parse(rawJson);
+//             // Handle backend error event
+//             if (json.type === 'error') {
+//               const rawError = json?.data?.message || '';
+//               let errorMessage = rawError;
+//               if (rawError.includes('AADSTS7000215') || rawError.includes('invalid_client')) {
+//                 errorMessage =
+//                   'Authentication failed. Invalid Microsoft client secret provided. Please check the app client secret configuration.';
+//               }
+//               setMessages((prev) =>
+//                 prev.map((msg) =>
+//                   msg.id === assistantMsgId
+//                     ? {
+//                         ...msg,
+//                         text: `Error: ${errorMessage}`,
+//                         isStreaming: false,
+//                         isComplete: true,
+//                         isError: true,
+//                       }
+//                     : msg
+//                 )
+//               );
+//               setLoading(false);
+//               setIsTyping(false);
+//               return;
+//             }
+//             // --- UPDATED FILTERING LOGIC ---
+//             // Only append text if it's the specific delta content.
+//             // Skip types like 'status', 'start', 'end', 'usage', etc.
+//             if (json.type === 'delta' && json.data?.text) {
+//               fullStitchedText += json.data.text;
+//
+//               // Update state without triggering the localStorage effect
+//               setMessages((prev) =>
+//                 prev.map((m) =>
+//                   m.id === assistantMsgId ? { ...m, text: fullStitchedText, isStreaming: true } : m
+//                 )
+//               );
+//             }
+//             // If you receive text messages that don't have a 'type' field
+//             else if (json.type === undefined && json.text) {
+//               fullStitchedText += json.text;
+//             }
+//             // Explicitly ignore 'status', 'start', 'end', 'usage'
+//             else if (['status', 'start', 'end', 'usage'].includes(json.type)) {
+//               continue;
+//             }
+//             // Fallback: If you see unexpected structures, you can log them
+//             // or append them as raw text only if they contain meaningful info.
+//           } catch (e) {
+//             // If JSON.parse fails, treat the line as raw text
+//             fullStitchedText += rawJson;
+//           }
+//           // -------------------------------
+//
+//           // Update the message state
+//           setMessages((prev) =>
+//             prev.map((m) =>
+//               m.id === assistantMsgId
+//                 ? { ...m, text: fullStitchedText, isStreaming: true } // Keep isStreaming TRUE here
+//                 : m
+//             )
+//           );
+//           // scroll();
+//         }
+//         setTimeout(() => scroll(), 10);
+//       }
+//     } else {
+//         // Handle standard JSON response
+//         const raw = await res.text();
+//         let displayOutput = raw;
+//         try {
+//           const parsed = JSON.parse(raw);
+//           displayOutput = JSON.stringify(parsed, null, 2);
+//         } catch (e) {
+//           displayOutput = raw;
+//         }
+//
+//         setLoading(false);
+//         setMessages((p) => [...p, {
+//           id: assistantMsgId,
+//           text: displayOutput,
+//           time: timestamp(), // <--- Generated here once response data is fully ready
+//           isStreaming: false,
+//           isComplete: true
+//         }]);
+//       }
+//   } catch (err: any) {
+//     setMessages((p) => [...p, { id: makeId(), text: `❌ Error: ${err.message}`, time: timestamp() }]);
+//     setLoading(false);
+//     setIsTyping(false);
+//   } finally {
+//     // This ensures that even if something crashes, the animations stop
+//     setIsTyping(false);
+//     // Don't set loading(false) here if you are handling it inside the 'done' block,
+//     // but it's safe to keep it here as a backup.
+//     setLoading(false);
+//     scroll();
+//   }
+// };
+// --- Updated handleSend in FloatingWindow ---
+const handleSend = async (val?: string) => {
   const query = val || input;
   if (!query.trim() || !options.apiUrl) return;
   setShowSuggestions(false);
+
+  const userMsgId = makeId();
   const assistantMsgId = makeId();
-  setMessages((p) => [...p, { id: makeId(), text: query, time: timestamp(), isUser: true }]);
+  const currentTime = timestamp(); // Get current timestamp for the user right now
+
+  // 1. Add the user message AND the empty assistant placeholder at the same time
+  setMessages((p) => [
+    ...p,
+    { id: userMsgId, text: query, time: currentTime, isUser: true },
+    { id: assistantMsgId, text: '', time: '', isStreaming: true } // Assistant starts blank with no timestamp yet
+  ]);
+
   setLoading(true);
   setInput('');
+  setIsTyping(true);
+  setAnimatedIds((prev) => new Set(prev).add(assistantMsgId));
 
   try {
     const method = (options.method || 'POST').toUpperCase();
@@ -297,11 +489,6 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
       const reader = res.body?.getReader();
       if (!reader) throw new Error('ReadableStream not supported');
 
-      setMessages((p) => [...p, { id: assistantMsgId, text: '', time: timestamp(), isStreaming: true }]);
-      setLoading(true);
-      setIsTyping(true);
-      setAnimatedIds((prev) => new Set(prev).add(assistantMsgId));
-
       const decoder = new TextDecoder();
       let fullStitchedText = '';
       let buffer = '';
@@ -309,15 +496,17 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          // 1. Mark the specific message as no longer streaming
+          // 2. Stream is complete: Update text, clear streaming, and assign the final timestamp here!
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, isStreaming: false, isComplete: true } : m
+            m.id === assistantMsgId ? {
+              ...m,
+              isStreaming: false,
+              isComplete: true,
+              time: timestamp() // <--- Timestamp prints only after response is complete
+            } : m
           ));
 
-          // 2. Kill the global loading state (this hides the spinner/thinking text)
           setLoading(false);
-
-          // 3. Ensure typing state is also cleared
           setIsTyping(false);
           break;
         }
@@ -334,7 +523,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
           try {
             const json = JSON.parse(rawJson);
-            // Handle backend error event
+
             if (json.type === 'error') {
               const rawError = json?.data?.message || '';
               let errorMessage = rawError;
@@ -351,6 +540,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                         isStreaming: false,
                         isComplete: true,
                         isError: true,
+                        time: timestamp() // Add timestamp on error too
                       }
                     : msg
                 )
@@ -359,76 +549,71 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
               setIsTyping(false);
               return;
             }
-            // --- UPDATED FILTERING LOGIC ---
-            // Only append text if it's the specific delta content.
-            // Skip types like 'status', 'start', 'end', 'usage', etc.
+
             if (json.type === 'delta' && json.data?.text) {
               fullStitchedText += json.data.text;
-
-              // Update state without triggering the localStorage effect
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId ? { ...m, text: fullStitchedText, isStreaming: true } : m
-                )
-              );
-            }
-            // If you receive text messages that don't have a 'type' field
-            else if (json.type === undefined && json.text) {
+            } else if (json.type === undefined && json.text) {
               fullStitchedText += json.text;
-            }
-            // Explicitly ignore 'status', 'start', 'end', 'usage'
-            else if (['status', 'start', 'end', 'usage'].includes(json.type)) {
+            } else if (['status', 'start', 'end', 'usage'].includes(json.type)) {
               continue;
             }
-            // Fallback: If you see unexpected structures, you can log them
-            // or append them as raw text only if they contain meaningful info.
           } catch (e) {
-            // If JSON.parse fails, treat the line as raw text
             fullStitchedText += rawJson;
           }
-          // -------------------------------
 
-          // Update the message state
+          // Update message text as chunks stream in
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgId
-                ? { ...m, text: fullStitchedText, isStreaming: true } // Keep isStreaming TRUE here
+                ? { ...m, text: fullStitchedText, isStreaming: true }
                 : m
             )
           );
-          // scroll();
         }
         setTimeout(() => scroll(), 10);
       }
     } else {
-        // Handle standard JSON response
+        // Handle standard JSON response fallback
         const raw = await res.text();
         let displayOutput = raw;
         try {
           const parsed = JSON.parse(raw);
-          // This creates the clean, indented JSON format
           displayOutput = JSON.stringify(parsed, null, 2);
         } catch (e) {
-          displayOutput = raw; // Keep original if not JSON
+          displayOutput = raw;
         }
 
         setLoading(false);
-        setMessages((p) => [...p, { id: assistantMsgId, text: displayOutput, time: timestamp(), isStreaming: false }]);
+        setIsTyping(false);
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantMsgId ? {
+            ...m,
+            text: displayOutput,
+            time: timestamp(), // <--- Assign timestamp once full JSON is received
+            isStreaming: false,
+            isComplete: true
+          } : m
+        ));
       }
   } catch (err: any) {
-    setMessages((p) => [...p, { id: makeId(), text: `❌ Error: ${err.message}`, time: timestamp() }]);
+    setMessages((prev) => prev.map((m) =>
+      m.id === assistantMsgId ? {
+        ...m,
+        text: `❌ Error: ${err.message}`,
+        time: timestamp(),
+        isStreaming: false,
+        isComplete: true,
+        isError: true
+      } : m
+    ));
     setLoading(false);
     setIsTyping(false);
   } finally {
-    // This ensures that even if something crashes, the animations stop
     setIsTyping(false);
-    // Don't set loading(false) here if you are handling it inside the 'done' block,
-    // but it's safe to keep it here as a backup.
     setLoading(false);
     scroll();
   }
 };
-
   const modelOptions = [
     { label: 'GPT-4', value: 'gpt-4' },
     { label: 'GPT-3.5', value: 'gpt-3.5' },
@@ -562,6 +747,18 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
               border: none !important;
               outline: none !important;
             }
+            /* Inside your <style> tag */
+            .chat-container pre {
+              max-width: 100%;
+              overflow-x: auto;
+              white-space: pre-wrap;
+              word-break: break-all;
+            }
+
+            .chat-container code {
+              white-space: pre-wrap;
+              word-break: break-all;
+            }
           `}</style>
 
       {(loading || isTyping) && (
@@ -573,7 +770,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 16, overflow: 'visible', background: '#0e1014', border: '1px solid #736f6f' }}>
       <div style={{
-        backgroundImage: 'linear-gradient(90deg, #3ec6e6, #2096ef)',
+        backgroundImage: 'linear-gradient(90deg, #0072f7, #0072f7)',
         padding: '8px 16px',
         display: 'flex',
         alignItems: 'center',
@@ -751,160 +948,163 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
           }
 
           return (
-              <div key={m.id} style={{
-                alignSelf: isUser ? 'flex-end' : 'flex-start',
-                maxWidth: '90%',
-                marginBottom: '12px'
+            <div key={m.id} style={{
+              alignSelf: isUser ? 'flex-end' : 'flex-start', // Pushes user right, bot left
+              maxWidth: '90%',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: isUser ? 'flex-end' : 'flex-start', // Aligns inner elements right or left
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: 10,
+                flexDirection: isUser ? 'row-reverse' : 'row', // Flips icon position for user vs bot
+                background: 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+                padding: '4px 0',
+                color: isUser ? '#ffffff' : '#e0e0e0',
+                width: '100%'
               }}>
-                <div style={{
-                  display: 'flex',
-                  gap: 10,
-                  padding: '12px 16px',
-                  borderRadius: isUser ? '20px 20px 0px 20px' : '0px 20px 20px 20px',
-                  background: isUser ? 'linear-gradient(135deg, #3ec6e6, #2096ef)' : 'rgba(255,255,255,0.08)',
-                  color: isUser ? '#000' : '#e0e0e0',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)'
-                }}>
-                  {/* Icon Column */}
-                  <div style={{ flexShrink: 0, marginTop: 4 }}>
-                    {isUser ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-                    ) : (
-                      <span style={{ fontSize: 24 }}>🤖</span>
-                    )}
+                {/* Icon Column */}
+                <div style={{ flexShrink: 0, marginTop: 4 }}>
+                  {isUser ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+                  ) : (
+                    <span style={{ fontSize: 20 }}>🤖</span>
+                  )}
+                </div>
+
+                {/* Text Column */}
+                <div style={{ flex: 1, minWidth: 0, textAlign: isUser ? 'right' : 'left' }}>
+                  <div style={{ fontSize: '0.7em', fontWeight: 'bold', marginBottom: 4, opacity: 0.7, letterSpacing: '0.5px' }}>
+                    {isUser ? 'YOU' : 'AETNA ASSISTANT'}
                   </div>
 
-                  {/* Text Column */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.65em', fontWeight: 'bold', marginBottom: 4, opacity: 0.7, letterSpacing: '0.5px' }}>
-                      {isUser ? 'YOU' : 'AETNA ASSISTANT'}
+                  <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                    <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', textAlign: 'left' }}>
+                      <TypingText
+                        key={m.id}
+                        text={m.text}
+                        shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
+                        onTypingProgress={scroll}
+                        isStreaming={m.isStreaming}
+                        isComplete={m.isComplete}
+                      />
                     </div>
-
-                    <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
-                      <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                        <TypingText
-                          key={m.id}
-                          text={m.text}
-                          shouldAnimate={!m.isUser && m.id !== 'welcome-msg'}
-                          onTypingProgress={scroll}
-                          isStreaming={m.isStreaming}
-                          isComplete={m.isComplete}
-                        />
+                  </div>
+                  {m.id === 'welcome-msg' && showSuggestions && (
+                    <div style={{ marginTop: 12, textAlign: 'left' }}>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: 'rgba(255,255,255,0.75)',
+                          marginBottom: 8
+                        }}
+                      >
+                        Suggestions
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8
+                        }}
+                      >
+                        {[
+                          'Why is the alert firing? What is the remediation?',
+                          'Which POD is causing high CPU?',
+                          'Show all prod logs',
+                          'What caused CPU spike yesterday?',
+                          'Have we seen this issue before?'
+                        ].map((s, i) => (
+                          <Button
+                            key={i}
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleSend(s)}
+                            style={{ borderRadius: 8, backgroundColor: '#FFFFFF', color: '#000000' }}
+                          >
+                            {s}
+                          </Button>
+                        ))}
                       </div>
                     </div>
-                    {m.id === 'welcome-msg' && showSuggestions && (
-                      <div style={{ marginTop: 12 }}>
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: 'rgba(255,255,255,0.75)',
-                            marginBottom: 8
-                          }}
-                        >
-                          Suggestions
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 8
-                          }}
-                        >
-                          {[
-                            'Why is the alert firing? What is the remediation?',
-                            'Which POD is causing high CPU?',
-                            'Show all prod logs',
-                            'What caused CPU spike yesterday?',
-                            'Have we seen this issue before?'
-                          ].map((s, i) => (
-                            <Button
-                              key={i}
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleSend(s)}
-                              style={{ borderRadius: 8, backgroundColor: '#FFFFFF', color: '#000000' }}
-                            >
-                              {s}
-                            </Button>
-                          ))}
-                        </div>
+                  )}
+                  {/* Action Bar & Timestamp Wrapper */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: isUser ? 'flex-end' : 'space-between',
+                    alignItems: 'center',
+                    marginTop: 8,
+                    borderTop: !isUser && !m.isStreaming && m.id !== 'welcome-msg' ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                    paddingTop: !isUser && !m.isStreaming && m.id !== 'welcome-msg' ? '6px' : '0'
+                  }}>
+                    {!isUser && !m.isStreaming && m.id !== 'welcome-msg' ? (
+                      <div style={{ display: 'flex', gap: 14 }}>
+                      <button
+                        className="action-btn"
+                        onClick={(e) => {
+                          navigator.clipboard.writeText(m.text);
+                          const btn = e.currentTarget;
+                          btn.classList.add('copy-success');
+                          setTimeout(() => btn.classList.remove('copy-success'), 500);
+                        }}
+                        title="Copy response"
+                      >
+                        📋
+                      </button>
+                      <button
+                        className="action-btn"
+                        style={{
+                          filter: m.vote === 'like' ? 'grayscale(0)' : 'grayscale(1)',
+                          opacity: m.vote === 'like' ? 1 : 0.6,
+                          transform: m.vote === 'like' ? 'scale(1.2)' : 'scale(1)'
+                        }}
+                        onClick={() => {
+                          setMessages(prev => prev.map(msg =>
+                            msg.id === m.id ? { ...msg, vote: msg.vote === 'like' ? null : 'like' } : msg
+                          ));
+                        }}
+                        title="Good Response"
+                      >
+                        👍
+                      </button>
+                      <button
+                        className="action-btn"
+                        style={{
+                          filter: m.vote === 'dislike' ? 'grayscale(0)' : 'grayscale(1)',
+                          opacity: m.vote === 'dislike' ? 1 : 0.6,
+                          transform: m.vote === 'dislike' ? 'scale(1.2)' : 'scale(1)'
+                        }}
+                        onClick={() => {
+                          setMessages(prev => prev.map(msg =>
+                            msg.id === m.id ? { ...msg, vote: msg.vote === 'dislike' ? null : 'dislike' } : msg
+                          ));
+                        }}
+                        title="Bad Response"
+                      >
+                        👎
+                      </button>
                       </div>
+                    ) : (
+                      <div />
                     )}
-                    {/* Action Bar & Timestamp Wrapper */}
                     <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginTop: 8,
-                      borderTop: !isUser && !m.isStreaming && m.id !== 'welcome-msg' ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                      paddingTop: !isUser && !m.isStreaming && m.id !== 'welcome-msg' ? '6px' : '0'
+                      fontSize: '10px',
+                      color: '#aaa',
+                      fontWeight: 'bolder'
                     }}>
-                      {!isUser && !m.isStreaming && m.id !== 'welcome-msg' ? (
-                        <div style={{ display: 'flex', gap: 14 }}>
-                        <button
-                          className="action-btn"
-                          onClick={(e) => {
-                            navigator.clipboard.writeText(m.text);
-                            const btn = e.currentTarget;
-                            btn.classList.add('copy-success');
-                            setTimeout(() => btn.classList.remove('copy-success'), 500);
-                          }}
-                          title="Copy response"
-                        >
-                          📋
-                        </button>
-                        <button
-                          className="action-btn"
-                          style={{
-                            filter: m.vote === 'like' ? 'grayscale(0)' : 'grayscale(1)',
-                            opacity: m.vote === 'like' ? 1 : 0.6,
-                            transform: m.vote === 'like' ? 'scale(1.2)' : 'scale(1)'
-                          }}
-                          onClick={() => {
-                            setMessages(prev => prev.map(msg =>
-                              msg.id === m.id ? { ...msg, vote: msg.vote === 'like' ? null : 'like' } : msg
-                            ));
-                          }}
-                          title="Good Response"
-                        >
-                          👍
-                        </button>
-                        <button
-                          className="action-btn"
-                          style={{
-                            filter: m.vote === 'dislike' ? 'grayscale(0)' : 'grayscale(1)',
-                            opacity: m.vote === 'dislike' ? 1 : 0.6,
-                            transform: m.vote === 'dislike' ? 'scale(1.2)' : 'scale(1)'
-                          }}
-                          onClick={() => {
-                            setMessages(prev => prev.map(msg =>
-                              msg.id === m.id ? { ...msg, vote: msg.vote === 'dislike' ? null : 'dislike' } : msg
-                            ));
-                          }}
-                          title="Bad Response"
-                        >
-                          👎
-                        </button>
-                        </div>
-                      ) : (
-                        <div />
-                      )}
-                      <div style={{
-                        fontSize: '10px',
-                        color: isUser ? '#333' : '#aaa',
-                        fontWeight: 'bolder'
-                      }}>
-                        {m.time}
-                      </div>
+                      {m.time}
                     </div>
                   </div>
                 </div>
               </div>
-            );
-
-          })}
+            </div>
+          );
+        })}
           {/* This block is now visually at the top ONLY while waiting for the first word */}
           {loading && messages[messages.length - 1]?.text === '' && (
             <div style={{
@@ -938,7 +1138,7 @@ export const FloatingWindow: React.FC<PanelProps<Options> & { setOpen: (open: bo
                 }}
                 />
 
-              <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #3ec6e6, #2096ef)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
+              <Button onClick={() => handleSend()} style={{ background: 'linear-gradient(90deg, #0072f7, #0072f7)', color: '#000', fontWeight: 'bold' }}>Ask</Button>
             </div>
           </div>
           <div style={{
@@ -1079,7 +1279,7 @@ export function FloatingChat() {
         <img
           src={robotIcon}
           alt="Robot Icon"
-          style={{ width: 100, height: 90 }}
+          style={{ width: 130, height: 120 }}
         />
       </div>
 
