@@ -998,45 +998,6 @@ const handleSend = async (val?: string) => {
                       />
                     </div>
                   </div>
-                  {m.id === 'welcome-msg' && showSuggestions && (
-                    <div style={{ marginTop: 12, textAlign: 'left' }}>
-                      <div
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          color: 'rgba(255,255,255,0.75)',
-                          marginBottom: 8
-                        }}
-                      >
-                        Suggestions
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 8
-                        }}
-                      >
-                        {[
-                          'Why is the alert firing? What is the remediation?',
-                          'Which POD is causing high CPU?',
-                          'Show all prod logs',
-                          'What caused CPU spike yesterday?',
-                          'Have we seen this issue before?'
-                        ].map((s, i) => (
-                          <Button
-                            key={i}
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleSend(s)}
-                            style={{ borderRadius: 8, backgroundColor: '#FFFFFF', color: '#000000' }}
-                          >
-                            {s}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                   {/* Action Bar & Timestamp Wrapper */}
                   <div style={{
                     display: 'flex',
